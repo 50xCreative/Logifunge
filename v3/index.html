@@ -797,7 +797,7 @@ function run() {
           return;
         }
         cont = runInterp._step();
-        runInterp.steps++;
+        if (cont) runInterp.steps++;
         if (runInterp.error) {
           updateDisplay(runInterp, w, h);
           setStatus(`⚠ ${runInterp.error}`, 'err');
@@ -847,7 +847,7 @@ function stepOnce() {
     return;
   }
   const cont = stepInterp._step();
-  stepInterp.steps++;
+  if (cont) stepInterp.steps++;
   updateDisplay(stepInterp, stepW, stepH);
   setStatus(`STEP ${stepInterp.steps} — IP(${stepInterp.ip.x},${stepInterp.ip.y})`);
   if (!cont || !stepInterp.running) { setStatus(`DONE — ${stepInterp.steps} steps`, 'ok'); stepInterp = null; }

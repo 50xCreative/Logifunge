@@ -511,7 +511,7 @@ function stepOnce() {
   }
   if (!stepInterp.running) { setStatus('DONE', 'ok'); return; }
   const cont = stepInterp._step();
-  stepInterp.steps++;
+  if (cont) stepInterp.steps++;
   if (stepInterp.output.length) textContent.textContent = stepInterp.output.join(' ');
   if (stepInterp.pixels.length) drawPixels(stepInterp.pixels, stepW, stepH);
   showStack(stepInterp.stack);
