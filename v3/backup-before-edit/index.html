@@ -826,18 +826,11 @@ function run() {
 
 // ── STEP ──────────────────────────────────────────────────────
 function stepOnce() {
-  const code = aceEditor.getValue();
-  if (!code.trim()) { setStatus('NO CODE'); return; }
-
-  stepW = Math.max(1, Math.min(256, parseInt(inpW.value) || 32));
-  stepH = Math.max(1, Math.min(256, parseInt(inpH.value) || 32));
-
-  const shouldResetStepInterp = !stepInterp || !stepInterp.running ||
-    stepInterp.sourceCode !== code ||
-    stepInterp.pixelWidth !== stepW ||
-    stepInterp.pixelHeight !== stepH;
-
-  if (shouldResetStepInterp) {
+  if (!stepInterp || !stepInterp.running) {
+    const code = aceEditor.getValue();
+    if (!code.trim()) { setStatus('NO CODE'); return; }
+    stepW = Math.max(1, Math.min(256, parseInt(inpW.value) || 32));
+    stepH = Math.max(1, Math.min(256, parseInt(inpH.value) || 32));
     stepInterp = new BefungeLogicInterpreter(code, stepW, stepH, getMaxSteps());
     stepInterp.running = true;
     setupCanvas(stepW, stepH);

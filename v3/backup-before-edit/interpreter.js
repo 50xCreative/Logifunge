@@ -119,7 +119,6 @@ class BefungeLogicInterpreter {
 
 
   constructor(code, pixelWidth = 64, pixelHeight = 64, maxSteps = 1000000) {
-    this.sourceCode = code;
     this.grid = this._parseGrid(code);
     this.ip = { x: 0, y: 0 };
     this.dir = { x: 1, y: 0 }; // start going right
