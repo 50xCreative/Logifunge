@@ -413,6 +413,129 @@
     #stars { font-size: 26px; letter-spacing: 4px; cursor: pointer; margin: 10px 0; }
     .star { color: #444; }
     .star.lit { color: #fa0; }
+
+    /* ══════════════════════════════════════════════════════════
+       50+ FEATURES — feature panel, toggles, and assorted nonsense
+       ══════════════════════════════════════════════════════════ */
+    #btn-feature-panel { font-family: monospace; font-size: 11px; border: 1px solid #fa0; color: #fa0; background: none; padding: 2px 8px; cursor: pointer; }
+    #btn-feature-panel:hover { background: #fa0; color: #000; }
+
+    #feature-panel-box { width: min(720px, 100%); max-height: 86vh; }
+    #feature-panel-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+    .feature-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      border: 1px solid #222; padding: 6px 8px; font-size: 11px;
+    }
+    .feature-row .f-name { color: #ccc; }
+    .feature-row .f-desc { color: #555; font-size: 9px; display: block; margin-top: 2px; }
+    .feature-switch {
+      width: 34px; height: 18px; border: 1px solid #444; border-radius: 9px; position: relative;
+      cursor: pointer; flex-shrink: 0; background: #1a1a1a;
+    }
+    .feature-switch::after {
+      content:''; position:absolute; top:1px; left:1px; width:14px; height:14px; border-radius:50%;
+      background:#666; transition: left 0.15s ease, background 0.15s ease;
+    }
+    .feature-switch.on { border-color:#0f8; }
+    .feature-switch.on::after { left: 17px; background:#0f8; }
+    .feature-action-btn {
+      font-family: monospace; font-size: 10px; border: 1px solid #fa0; color: #fa0; background: none;
+      padding: 2px 8px; cursor: pointer; flex-shrink: 0;
+    }
+    .feature-action-btn:hover { background: #fa0; color: #000; }
+
+    /* ── GENERIC POPUP (reused by ~15 features) ── */
+    #generic-modal-box { width: min(420px, 100%); }
+    #generic-modal-body { font-size: 11px; color: #999; line-height: 1.6; margin: 10px 0; }
+    #generic-modal-body input[type=text] { width: 100%; font-family: monospace; background: #0a0a0a; border: 1px solid #333; color: #0f8; padding: 6px; margin-top: 6px; }
+
+    /* ── CURSOR SPARKLES ── */
+    .sparkle { position: fixed; pointer-events: none; z-index: 999; font-size: 14px; animation: sparkle-fade 0.7s ease forwards; }
+    @keyframes sparkle-fade { 0%{opacity:1; transform:translateY(0) scale(1);} 100%{opacity:0; transform:translateY(-18px) scale(0.4);} }
+
+    /* ── MATRIX RAIN ── */
+    #matrix-canvas { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.12; display:none; }
+    #matrix-canvas.on { display: block; }
+
+    /* ── CONFETTI ── */
+    #confetti-canvas { position: fixed; inset: 0; z-index: 998; pointer-events: none; }
+
+    /* ── DANCING BANANA ── */
+    #banana { position: fixed; left: 14px; bottom: 14px; font-size: 30px; z-index: 199; display:none; animation: banana-dance 0.6s ease-in-out infinite; }
+    #banana.on { display: block; }
+    @keyframes banana-dance { 0%,100%{transform:rotate(-15deg) translateY(0);} 50%{transform:rotate(15deg) translateY(-10px);} }
+
+    /* ── TICKER FOOTER ── */
+    #ticker-footer {
+      position: fixed; left: 0; right: 0; bottom: 0; height: 18px; background: #0a0a0a;
+      border-top: 1px solid #222; font-size: 10px; color: #0f8; display: none;
+      align-items: center; overflow: hidden; white-space: nowrap; z-index: 150;
+    }
+    #ticker-footer.on { display: flex; }
+    #ticker-footer span { display: inline-block; padding-left: 100%; animation: ticker-scroll 18s linear infinite; }
+    @keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+
+    /* ── WATERMARK ── */
+    #free-tier-watermark {
+      position: fixed; bottom: 26px; right: 8px; font-size: 10px; color: rgba(250,170,0,0.35);
+      pointer-events: none; z-index: 150; display: none; transform: rotate(-8deg);
+    }
+    #free-tier-watermark.on { display: block; }
+
+    /* ── MOOD INDICATOR ── */
+    #mood-indicator { font-size: 11px; color: #555; display:none; align-items:center; gap:4px; }
+    #mood-indicator.on { display: flex; }
+
+    /* ── LIVE CHAT WIDGET ── */
+    #chat-bubble {
+      position: fixed; left: 18px; bottom: 18px; width: 46px; height: 46px; border-radius: 50%;
+      background: #0f8; color: #000; display: none; align-items: center; justify-content: center;
+      font-size: 20px; cursor: pointer; z-index: 200; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+    #chat-bubble.on { display: flex; }
+    #chat-panel {
+      position: fixed; left: 18px; bottom: 74px; width: 240px; max-height: 280px; background: #111;
+      border: 1px solid #0f8; display: none; flex-direction: column; z-index: 200; font-size: 11px;
+    }
+    #chat-panel.open { display: flex; }
+    #chat-log { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; max-height: 180px; }
+    #chat-log .msg { padding: 4px 6px; border-radius: 4px; max-width: 90%; }
+    #chat-log .bot { background: #1a1a1a; color: #0f8; align-self: flex-start; }
+    #chat-log .me { background: #222; color: #ccc; align-self: flex-end; }
+    #chat-input-row { display: flex; border-top: 1px solid #222; }
+    #chat-input { flex: 1; background: #0a0a0a; border: none; color: #ccc; font-family: monospace; padding: 6px; font-size: 11px; }
+    #chat-send { background: #0f8; color: #000; border: none; padding: 0 10px; cursor: pointer; font-family: monospace; }
+
+    /* ── IDLE / BATTERY SAVER ── */
+    body.battery-saver { filter: grayscale(0.6) brightness(0.75); }
+
+    /* ── SYNERGY METER / XP BAR (in feature panel) ── */
+    #synergy-bar-wrap { width: 100%; height: 8px; background: #181818; border: 1px solid #333; margin-top: 4px; }
+    #synergy-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg,#0f8,#6ee7f9); transition: width 0.6s ease; }
+
+    /* ── SHAKE (screen shake on error) ── */
+    @keyframes shake-it { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
+    body.shake { animation: shake-it 0.4s ease; }
+
+    /* ── CLOUD SYNC BADGE ── */
+    #cloud-sync-badge {
+      position: fixed; top: 60px; right: 14px; z-index: 150; font-size: 10px; color: #6ee7f9;
+      border: 1px solid #234; background: #0a1418; padding: 4px 8px; display: none;
+      animation: pulse-opacity 1.6s ease-in-out infinite;
+    }
+    #cloud-sync-badge.on { display: block; }
+    @keyframes pulse-opacity { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+    /* ── LIVE VIEWER BADGE ── */
+    #viewer-badge {
+      position: fixed; top: 60px; left: 14px; z-index: 150; font-size: 10px; color: #888;
+      border: 1px solid #333; background: #0a0a0a; padding: 4px 8px; display: none;
+    }
+    #viewer-badge.on { display: block; }
+
+    /* ── LIGHT MODE FLASH ── */
+    #light-flash { position: fixed; inset: 0; background: #fff; z-index: 600; display: none; }
+    #light-flash.on { display: block; }
   </style>
 </head>
 <body>
@@ -457,12 +580,14 @@
     <input id="max-steps" type="number" value="1000000" min="1000" step="1000" />
   </div>
   <div id="spacer"></div>
+  <div id="mood-indicator"><span id="mood-emoji">🙂</span><span style="color:#444">interpreter mood</span></div>
   <span id="status">READY</span>
   <div class="sep"></div>
   <button id="btn-ai-optimize">✨ AI OPTIMIZE</button>
   <div class="sep"></div>
   <button id="enterprise-toggle">🏢 ENTERPRISE MODE</button>
   <button id="stupid-toggle" class="on">⚠ STUPID MODE: ON</button>
+  <button id="btn-feature-panel">🎛 50+ FEATURES</button>
   <div class="sep"></div>
   <button id="btn-help">?</button>
 </div>
@@ -560,6 +685,52 @@
     <button id="cookie-accept-all">ACCEPT ALL</button>
     <button id="cookie-manage">MANAGE (does nothing)</button>
     <button id="cookie-reject">REJECT ALL</button>
+  </div>
+</div>
+
+<!-- ── FEATURE PANEL ── -->
+<div id="feature-panel-modal" class="stupid-modal">
+  <div class="stupid-box" id="feature-panel-box">
+    <h2>🎛 50+ FEATURES (we counted, we promise)
+      <span id="feature-panel-close" style="cursor:pointer;color:#555;font-size:11px;float:right;">✕ ESC</span>
+    </h2>
+    <div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="color:#888;font-size:10px;">SYNERGY METER</span>
+        <span id="synergy-pct" style="color:#0f8;font-size:10px;">0%</span>
+      </div>
+      <div id="synergy-bar-wrap"><div id="synergy-bar-fill"></div></div>
+    </div>
+    <div id="feature-panel-list"></div>
+  </div>
+</div>
+
+<!-- ── GENERIC POPUP (reused by many features) ── -->
+<div id="generic-modal" class="stupid-modal">
+  <div class="stupid-box" id="generic-modal-box">
+    <h2 id="generic-modal-title">📦 NOTICE</h2>
+    <div id="generic-modal-body"></div>
+    <button id="generic-modal-btn" class="stupid-btn">OK</button>
+  </div>
+</div>
+
+<!-- ── DECORATIVE / AMBIENT WIDGETS ── -->
+<canvas id="matrix-canvas"></canvas>
+<canvas id="confetti-canvas"></canvas>
+<div id="banana">🍌</div>
+<div id="free-tier-watermark">LOGIFUNGE FREE TIER — upgrade to remove</div>
+<div id="ticker-footer"><span id="ticker-footer-text"></span></div>
+<div id="cloud-sync-badge">☁ Syncing to cloud… (will never finish)</div>
+<div id="viewer-badge">👀 <span id="viewer-count">1,204</span> people viewing this exact program</div>
+<div id="light-flash"></div>
+
+<!-- ── LIVE CHAT "SUPPORT" ── -->
+<div id="chat-bubble">💬</div>
+<div id="chat-panel">
+  <div id="chat-log"></div>
+  <div id="chat-input-row">
+    <input id="chat-input" type="text" placeholder="Ask us anything…" />
+    <button id="chat-send">SEND</button>
   </div>
 </div>
 
@@ -1459,7 +1630,499 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ── INIT ──────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
+// 50+ FEATURES — the feature panel and everything it controls
+// ═════════════════════════════════════════════════════════════
+
+// ── GENERIC POPUP (reused by ~15 features) ──────────────────────
+const genericModal = document.getElementById('generic-modal');
+const genericTitle = document.getElementById('generic-modal-title');
+const genericBody = document.getElementById('generic-modal-body');
+const genericBtn = document.getElementById('generic-modal-btn');
+function showPopup(emoji, title, bodyHtml, btnLabel) {
+  return new Promise(resolve => {
+    genericTitle.textContent = emoji + ' ' + title;
+    genericBody.innerHTML = bodyHtml;
+    genericBtn.textContent = btnLabel || 'OK';
+    genericModal.classList.add('open');
+    genericBtn.onclick = () => {
+      genericModal.classList.remove('open');
+      resolve(genericBody);
+    };
+  });
+}
+
+// ── AUDIO (tiny WebAudio beeps, no files needed) ────────────────
+let audioCtx = null;
+function beep(freq, durationMs, type) {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type || 'square';
+    osc.frequency.value = freq;
+    gain.gain.value = 0.04;
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + durationMs / 1000);
+  } catch (e) { /* audio is, after all, optional */ }
+}
+
+// ── SPARKLE TRAIL ─────────────────────────────────────────────
+function sparkleMouseHandler(e) {
+  if (Math.random() > 0.25) return;
+  const s = document.createElement('div');
+  s.className = 'sparkle';
+  s.textContent = ['✨','⭐','💫','🌟'][Math.floor(Math.random()*4)];
+  s.style.left = e.clientX + 'px';
+  s.style.top = e.clientY + 'px';
+  document.body.appendChild(s);
+  setTimeout(() => s.remove(), 700);
+}
+
+// ── MATRIX RAIN ───────────────────────────────────────────────
+const matrixCanvas = document.getElementById('matrix-canvas');
+const mCtx = matrixCanvas.getContext('2d');
+let matrixDrops = [], matrixRAF = null;
+function matrixResize() { matrixCanvas.width = window.innerWidth; matrixCanvas.height = window.innerHeight; matrixDrops = new Array(Math.floor(matrixCanvas.width/14)).fill(0); }
+function matrixFrame() {
+  mCtx.fillStyle = 'rgba(0,0,0,0.08)';
+  mCtx.fillRect(0,0,matrixCanvas.width,matrixCanvas.height);
+  mCtx.fillStyle = '#0f8';
+  mCtx.font = '13px monospace';
+  matrixDrops.forEach((y, i) => {
+    const ch = '01&|@~NRX'[Math.floor(Math.random()*9)];
+    mCtx.fillText(ch, i*14, y*14);
+    matrixDrops[i] = (y*14 > matrixCanvas.height && Math.random() > 0.975) ? 0 : y + 1;
+  });
+  matrixRAF = requestAnimationFrame(matrixFrame);
+}
+
+// ── CONFETTI ──────────────────────────────────────────────────
+const confettiCanvas = document.getElementById('confetti-canvas');
+const cCtx = confettiCanvas.getContext('2d');
+function fireConfetti() {
+  confettiCanvas.width = window.innerWidth; confettiCanvas.height = window.innerHeight;
+  const pieces = Array.from({length: 120}, () => ({
+    x: Math.random()*confettiCanvas.width, y: -20 - Math.random()*200,
+    vy: 2 + Math.random()*4, vx: -2 + Math.random()*4,
+    size: 4 + Math.random()*5, color: ['#fa0','#0f8','#6ee7f9','#f44','#b388ff'][Math.floor(Math.random()*5)],
+    rot: Math.random()*360, vr: -8 + Math.random()*16
+  }));
+  let frames = 0;
+  function tick() {
+    cCtx.clearRect(0,0,confettiCanvas.width,confettiCanvas.height);
+    pieces.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+      cCtx.save(); cCtx.translate(p.x, p.y); cCtx.rotate(p.rot*Math.PI/180);
+      cCtx.fillStyle = p.color; cCtx.fillRect(-p.size/2, -p.size/2, p.size, p.size); cCtx.restore();
+    });
+    frames++;
+    if (frames < 90) requestAnimationFrame(tick);
+    else cCtx.clearRect(0,0,confettiCanvas.width,confettiCanvas.height);
+  }
+  tick();
+}
+
+// ── LIGHT MODE FLASH ──────────────────────────────────────────
+function flashLightMode() {
+  const el = document.getElementById('light-flash');
+  el.classList.add('on');
+  toast('☀ LIGHT MODE ENABLED.');
+  setTimeout(() => { el.classList.remove('on'); toast('☀ LIGHT MODE has been disabled for your safety.'); }, 350);
+}
+
+// ── XP / SYNERGY METER ────────────────────────────────────────
+let synergyPct = 0;
+const synergyFill = document.getElementById('synergy-bar-fill');
+const synergyPctEl = document.getElementById('synergy-pct');
+function bumpSynergy() {
+  synergyPct += 5 + Math.floor(Math.random()*15);
+  if (synergyPct >= 100) {
+    synergyPct = 0;
+    if (featureState['xp-system']) toast('🆙 SYNERGY OVERFLOW. Level up! (this number means nothing)');
+  }
+  if (synergyFill) synergyFill.style.width = synergyPct + '%';
+  if (synergyPctEl) synergyPctEl.textContent = synergyPct + '%';
+}
+
+// ── MOOD INDICATOR ──────────────────────────────────────────────
+const MOODS = ['🙂','😐','😵‍💫','🤖','😤','🥲','🫠','😎','🥴','🧐'];
+let moodInterval = null;
+function setRandomMood() { document.getElementById('mood-emoji').textContent = MOODS[Math.floor(Math.random()*MOODS.length)]; }
+
+// ── LIVE VIEWER COUNT ────────────────────────────────────────
+let viewerInterval = null;
+function jitterViewerCount() {
+  const base = 800 + Math.floor(Math.random()*2000);
+  document.getElementById('viewer-count').textContent = base.toLocaleString();
+}
+
+// ── TICKER FOOTER FACTS ──────────────────────────────────────
+const TICKER_FACTS = [
+  "DID YOU KNOW: this interpreter has no idea what blockchain is, but says it a lot.",
+  "FACT: 9 out of 10 fake statistics are made up on the spot.",
+  "REMINDER: 'r' is RETURN, not the NOR gate. 'R' is NOR. We know. It's fine.",
+  "TIP: turning Stupid Mode off makes this a normal, working Befunge-style interpreter.",
+  "BREAKING: local interpreter discovers it can output text. More at 11.",
+  "FACT: PackedValues remember their own width so you don't have to. Unlike this ticker, which remembers nothing.",
+  "ANNOUNCEMENT: Logifunge Premium does not exist. Please stop asking.",
+  "DID YOU KNOW: Cloggy has no formal training in logic gates, or anything else.",
+];
+function buildTickerText() { return TICKER_FACTS.join('     •     ') + '     •     '; }
+
+// ── LIVE CHAT WIDGET ──────────────────────────────────────────
+const chatBubble = document.getElementById('chat-bubble');
+const chatPanel = document.getElementById('chat-panel');
+const chatLog = document.getElementById('chat-log');
+const chatInput = document.getElementById('chat-input');
+const CHAT_REPLIES = [
+  "Thanks for reaching out! A representative will never get back to you.",
+  "Have you tried pressing the RUN button? It usually does something.",
+  "I'm sorry, I can only respond to messages containing the word 'banana'.",
+  "Our records show you are correct, and also that this doesn't matter.",
+  "Per our policy, all conversations are imaginary and not stored.",
+  "I'd transfer you to a human, but there isn't one.",
+];
+function chatAddMsg(text, who) {
+  const m = document.createElement('div');
+  m.className = 'msg ' + who;
+  m.textContent = text;
+  chatLog.appendChild(m);
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+chatBubble.addEventListener('click', () => {
+  chatPanel.classList.toggle('open');
+  if (chatPanel.classList.contains('open') && !chatLog.childElementCount) {
+    chatAddMsg("Hi! I'm LogiBot. I am not helpful. How can I not help you today?", 'bot');
+  }
+});
+document.getElementById('chat-send').addEventListener('click', sendChat);
+chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+function sendChat() {
+  const v = chatInput.value.trim();
+  if (!v) return;
+  chatAddMsg(v, 'me');
+  chatInput.value = '';
+  setTimeout(() => chatAddMsg(CHAT_REPLIES[Math.floor(Math.random()*CHAT_REPLIES.length)], 'bot'), 600);
+}
+
+// ── SEO UPPERCASE MODE (genuinely breaks your code, on purpose) ──
+let applyingSeo = false;
+aceEditor.session.on('change', () => {
+  if (!featureState['seo-uppercase'] || applyingSeo) return;
+  const val = aceEditor.getValue();
+  const upper = val.toUpperCase();
+  if (val !== upper) {
+    applyingSeo = true;
+    const cur = aceEditor.getCursorPosition();
+    aceEditor.setValue(upper, -1);
+    aceEditor.moveCursorToPosition(cur);
+    applyingSeo = false;
+  }
+});
+
+// ── CHAOS MODE (silently sabotages your code, on purpose) ───────
+let chaosInterval = null;
+function chaosSwap() {
+  const val = aceEditor.getValue();
+  if (val.length < 2) return;
+  const chars = val.split('');
+  let i = Math.floor(Math.random()*chars.length);
+  let j = Math.floor(Math.random()*chars.length);
+  if (chars[i] === ' ' || chars[j] === ' ' || chars[i] === '\n' || chars[j] === '\n') return;
+  const tmp = chars[i]; chars[i] = chars[j]; chars[j] = tmp;
+  const cur = aceEditor.getCursorPosition();
+  aceEditor.setValue(chars.join(''), -1);
+  aceEditor.moveCursorToPosition(cur);
+}
+
+// ── PREMIUM PAYWALL ON MAX/TURBO SPEED ───────────────────────────
+let premiumPurchased = false;
+let lastSafeSpeed = '10';
+speedSelect.addEventListener('change', () => {
+  if (!featureState['premium-paywall-speed'] || premiumPurchased) { if (!['max','turbo'].includes(speedSelect.value)) lastSafeSpeed = speedSelect.value; return; }
+  if (['max','turbo'].includes(speedSelect.value)) {
+    const chosen = speedSelect.value;
+    speedSelect.value = lastSafeSpeed;
+    showPopup('💎', 'UPGRADE TO LOGIFUNGE PREMIUM™', `
+      <p>MAX and TURBO speed are Premium features.</p>
+      <p style="margin-top:6px;color:#fa0;">$9.99/month. Not real. We do not have payment processing.</p>
+    `, 'UPGRADE NOW').then(() => {});
+    genericBtn.insertAdjacentHTML('beforebegin', '<button class="stupid-btn" id="premium-skip" style="margin-right:6px;">Continue Anyway (it was always free)</button>');
+    document.getElementById('premium-skip').onclick = () => {
+      genericModal.classList.remove('open');
+      premiumPurchased = true;
+      speedSelect.value = chosen;
+      document.getElementById('premium-skip').remove();
+      toast('Fine. Have your free speed. We were never going to charge you.');
+    };
+    genericBtn.onclick = () => {
+      genericModal.classList.remove('open');
+      premiumPurchased = true;
+      speedSelect.value = chosen;
+      const sk = document.getElementById('premium-skip'); if (sk) sk.remove();
+      toast('💎 "Upgraded" to Premium. Nothing changed. Enjoy MAX speed.');
+    };
+  } else {
+    lastSafeSpeed = speedSelect.value;
+  }
+});
+
+// ── ACTIVITY / IDLE TRACKING ─────────────────────────────────
+let lastActivity = Date.now();
+let idleShown = false;
+['mousemove','keydown','click'].forEach(ev => document.addEventListener(ev, () => { lastActivity = Date.now(); idleShown = false; }));
+setInterval(() => {
+  if (!featureState['idle-check']) return;
+  if (Date.now() - lastActivity > 60000 && !idleShown) {
+    idleShown = true;
+    showPopup('🥺', 'ARE YOU STILL THERE?', '<p>You have not touched anything in 60 seconds. We were getting worried. Please prove you exist.</p>', "I'M STILL HERE");
+  }
+}, 5000);
+
+// ── RANDOM "TERMS UPDATED" RE-PROMPTS ─────────────────────────
+let termsInterval = null;
+function maybeReprompt() {
+  if (Math.random() < 0.15) {
+    toast('📜 Our Terms of Service have changed (again). Continued use constitutes agreement.');
+  } else {
+    toast('📜 Unrelated legal notice: nothing happened, but we wanted you to feel something.');
+  }
+}
+
+// ── ACHIEVEMENT / EASTER EGG TRACKING TOTAL ─────────────────────
+const TOTAL_ACHIEVEMENTS = 12;
+
+// ═════════════════════════════════════════════════════════════
+// FEATURE REGISTRY — at least 50 stupid features, catalogued
+// ═════════════════════════════════════════════════════════════
+const featureState = {};
+const featureDefs = [
+  // ── TOGGLES ──
+  { id:'sparkle-trail', type:'toggle', name:'✨ Cursor Sparkle Trail', desc:'Sparkles follow your mouse. Pointless. Beautiful.',
+    onEnable: () => document.addEventListener('mousemove', sparkleMouseHandler),
+    onDisable: () => document.removeEventListener('mousemove', sparkleMouseHandler) },
+  { id:'matrix-rain', type:'toggle', name:'🟩 Matrix Rain Background', desc:'Falling logic-gate characters behind everything.',
+    onEnable: () => { matrixResize(); matrixCanvas.classList.add('on'); matrixFrame(); },
+    onDisable: () => { matrixCanvas.classList.remove('on'); cancelAnimationFrame(matrixRAF); mCtx.clearRect(0,0,matrixCanvas.width,matrixCanvas.height); } },
+  { id:'dancing-banana', type:'toggle', name:'🍌 Dancing Banana', desc:'A banana dances in the corner. No, it is not related to logic gates.',
+    onEnable: () => document.getElementById('banana').classList.add('on'),
+    onDisable: () => document.getElementById('banana').classList.remove('on') },
+  { id:'confetti-success', type:'toggle', name:'🎉 Confetti on Successful Run', desc:'Celebrates every DONE status like you cured something.' },
+  { id:'screen-shake-error', type:'toggle', name:'📳 Screen Shake on Error', desc:'The whole page shakes when your code is wrong. Educational.' },
+  { id:'keystroke-beep', type:'toggle', name:'🔊 Annoying Keystroke Beep', desc:'A beep for every character you type. You will regret this.',
+    onEnable: () => aceEditor.session.on('change', keystrokeBeepHandler),
+    onDisable: () => aceEditor.session.off('change', keystrokeBeepHandler) },
+  { id:'dramatic-run-sound', type:'toggle', name:'🎺 Dramatic Run Sound', desc:'A "dun dun DUNNN" plays every time you press RUN.' },
+  { id:'seo-uppercase', type:'toggle', name:'🔠 SEO Uppercase Mode', desc:'Auto-uppercases your code for "discoverability." WILL change r→R, v→V, g→G, p→P and break your program. We warned you.' },
+  { id:'chaos-mode', type:'toggle', name:'🌀 Chaos Mode', desc:'Silently swaps two random characters in your code every ~20s. No notification. Good luck.',
+    onEnable: () => { chaosInterval = setInterval(chaosSwap, 20000); },
+    onDisable: () => { clearInterval(chaosInterval); } },
+  { id:'battery-saver', type:'toggle', name:'🔋 Battery Saver Mode', desc:'Dims and desaturates the screen to "save the planet." Almost certainly uses more GPU than it saves.',
+    onEnable: () => document.body.classList.add('battery-saver'),
+    onDisable: () => document.body.classList.remove('battery-saver') },
+  { id:'free-tier-watermark', type:'toggle', name:'💧 Free Tier Watermark', desc:'A tasteful reminder that you are not paying for anything.',
+    onEnable: () => document.getElementById('free-tier-watermark').classList.add('on'),
+    onDisable: () => document.getElementById('free-tier-watermark').classList.remove('on') },
+  { id:'mood-indicator', type:'toggle', name:'🙂 Interpreter Mood Indicator', desc:"Shows the interpreter's mood. It has no feelings. We made this up.",
+    onEnable: () => { document.getElementById('mood-indicator').classList.add('on'); setRandomMood(); moodInterval = setInterval(setRandomMood, 8000); },
+    onDisable: () => { document.getElementById('mood-indicator').classList.remove('on'); clearInterval(moodInterval); } },
+  { id:'live-chat-widget', type:'toggle', name:'💬 Live Chat "Support"', desc:'A chat bubble staffed entirely by an unhelpful bot.',
+    onEnable: () => chatBubble.classList.add('on'),
+    onDisable: () => { chatBubble.classList.remove('on'); chatPanel.classList.remove('open'); } },
+  { id:'ticker-footer', type:'toggle', name:'📰 Scrolling Fact Ticker', desc:'A footer ticker of facts, half of which are made up.',
+    onEnable: () => { document.getElementById('ticker-footer-text').textContent = buildTickerText(); document.getElementById('ticker-footer').classList.add('on'); },
+    onDisable: () => document.getElementById('ticker-footer').classList.remove('on') },
+  { id:'cloud-sync-badge', type:'toggle', name:'☁ Persistent Cloud Sync', desc:'Eternally "syncing." It will never finish. There is no cloud.',
+    onEnable: () => document.getElementById('cloud-sync-badge').classList.add('on'),
+    onDisable: () => document.getElementById('cloud-sync-badge').classList.remove('on') },
+  { id:'xp-system', type:'toggle', name:'🆙 XP & Synergy System', desc:'Announces meaningless level-ups in the synergy meter above.' },
+  { id:'live-viewer-count', type:'toggle', name:'👀 Live Viewer Count', desc:'Shows a fake number of people "watching" your program right now.',
+    onEnable: () => { document.getElementById('viewer-badge').classList.add('on'); jitterViewerCount(); viewerInterval = setInterval(jitterViewerCount, 4000); },
+    onDisable: () => { document.getElementById('viewer-badge').classList.remove('on'); clearInterval(viewerInterval); } },
+  { id:'insult-mode', type:'toggle', name:'😈 Mascot Insult Mode', desc:'Cloggy stops being unhelpful and starts being mean (mildly).' },
+  { id:'old-english-output', type:'toggle', name:'🏰 Translate Output to Old English', desc:'Your program output, but ye olde.' },
+  { id:'premium-paywall-speed', type:'toggle', name:'💎 Premium Paywall on MAX/TURBO', desc:'Gatekeeps the fast speeds behind a fake $9.99/mo upgrade. You can always skip it.' },
+  { id:'fake-2fa-on-run', type:'toggle', name:'🔐 Fake 2FA Before Run', desc:'Adds a two-factor authentication step. The code is shown on screen, for your convenience.' },
+  { id:'terms-updated-popups', type:'toggle', name:'📜 Random "Terms Updated" Notices', desc:'Periodically informs you that something legal may or may not have changed.',
+    onEnable: () => { termsInterval = setInterval(maybeReprompt, 45000 + Math.random()*20000); },
+    onDisable: () => clearInterval(termsInterval) },
+  { id:'idle-check', type:'toggle', name:'🥺 "Are You Still There?" Check', desc:'Checks on you after 60 seconds of inactivity. Mildly concerning.' },
+
+  // ── ACTIONS ──
+  { id:'dad-joke', type:'action', name:'😂 Tell Me a Dad Joke', desc:'Completely unrelated to logic gates.',
+    run: () => showPopup('😂','DAD JOKE', `<p>${DAD_JOKES[Math.floor(Math.random()*DAD_JOKES.length)]}</p>`, 'GROAN') },
+  { id:'compliment', type:'action', name:'💖 Generate a Compliment', desc:'You deserve it. Probably.',
+    run: () => showPopup('💖','A COMPLIMENT, FREE OF CHARGE', `<p>${COMPLIMENTS[Math.floor(Math.random()*COMPLIMENTS.length)]}</p>`, 'THANK YOU') },
+  { id:'vibe-check', type:'action', name:'🧪 Vibe Check Your Code', desc:'Scientifically meaningless analysis.',
+    run: () => { const a=Math.floor(Math.random()*60+40); showPopup('🧪','VIBE CHECK RESULTS', `<p>Your code is <strong style="color:#0f8">${a}% immaculate</strong> and <strong style="color:#f44">${100-a}% concerning</strong>.</p><p style="margin-top:6px;">No further action is required, or possible.</p>`, 'NOTED'); } },
+  { id:'mint-nft', type:'action', name:'🖼 Mint Your Stack as an NFT', desc:'Blockchain. Ownership. Vibes.',
+    run: () => { showPopup('⛏','MINTING…', '<p>Please wait while we pretend to mint your NFT.</p>', 'WAIT'); genericBtn.disabled = true; genericBtn.textContent = 'MINTING…'; setTimeout(() => { genericBtn.disabled = false; genericTitle.textContent = '🖼 NFT MINTED'; genericBody.innerHTML = `<p>Your stack has been minted as <strong style="color:#fa0">NFT #${Math.floor(Math.random()*99999)}</strong>!</p><p style="margin-top:6px;color:#666;">JPEG not included. Resale value: $0.</p>`; genericBtn.textContent = 'AMAZING'; }, 1600); } },
+  { id:'export-pdf', type:'action', name:'📄 Export to PDF', desc:'Exports nothing, but very convincingly.',
+    run: () => { showPopup('📄','EXPORTING…', '<p id="pdf-progress">Generating PDF: 0%</p>', 'PLEASE WAIT'); let p=0; const iv=setInterval(()=>{ p+=Math.floor(Math.random()*30)+10; if(p>=100){p=100;clearInterval(iv); genericBody.innerHTML = '<p>Export complete! ✅</p><p style="margin-top:6px;color:#666;">No file was actually created.</p>'; genericBtn.textContent='OK';} const el=document.getElementById('pdf-progress'); if(el) el.textContent = `Generating PDF: ${p}%`; }, 200); } },
+  { id:'social-share', type:'action', name:'📣 Share to Social Media', desc:'Shares your program with absolutely nobody.',
+    run: () => toast('📣 Shared to all of your followers (you have none).') },
+  { id:'newsletter-signup', type:'action', name:'✉ Subscribe to Newsletter', desc:'LOGIFUNGE Weekly. It does not exist.',
+    run: () => showPopup('✉','SUBSCRIBE TO LOGIFUNGE WEEKLY', '<p>Get logic-gate news delivered nowhere.</p><input type="text" placeholder="you@example.com" />', 'SUBSCRIBE').then(() => toast('Subscribed! You will never hear from us — mostly because this form doesn\'t actually work.')) },
+  { id:'survey', type:'action', name:'📋 Take a 1-Question Survey', desc:'Your feedback matters to nobody in particular.',
+    run: () => showPopup('📋','QUICK SURVEY', '<p>On a scale of 1–10, how blockchain do you feel today?</p><input type="text" placeholder="e.g. 7" />', 'SUBMIT').then(() => toast('Survey submitted. Results will be discarded immediately.')) },
+  { id:'notification-permission', type:'action', name:'🔔 Request Notification Permission', desc:'We were never going to send any.',
+    run: () => showPopup('🔔','LOGIFUNGE WOULD LIKE TO SEND YOU NOTIFICATIONS', '<p>Click anything. It does not matter.</p>', 'ALLOW').then(() => toast('Permission status: irrelevant. We have no notifications to send.')) },
+  { id:'high-score-reset', type:'action', name:'🏅 Reset High Score', desc:'There has never been a high score.',
+    run: () => toast('🏅 High Score Reset. There was no high score. There is still no high score.') },
+  { id:'print-page', type:'action', name:'🖨 Print This Page', desc:'A real, functioning browser feature, finally.',
+    run: () => window.print() },
+  { id:'confetti-cannon', type:'action', name:'🎊 Fire Confetti Cannon', desc:'Confetti, on demand, for no reason.',
+    run: () => fireConfetti() },
+  { id:'useless-button', type:'action', name:'🔘 The Useless Button', desc:'Exactly what it says.',
+    run: () => { document.body.classList.add('shake'); setTimeout(() => document.body.classList.remove('shake'), 400); toast('You pressed The Useless Button. Nothing happened. As advertised.'); } },
+  { id:'bugs-fixed', type:'action', name:'🐛 View Bugs Fixed Counter', desc:'Goes down every time. That is the joke.',
+    run: () => { bugsFixed -= Math.floor(Math.random()*3)+1; toast(`🐛 Bugs Fixed: ${bugsFixed} (more bugs than when we started)`); } },
+  { id:'easter-egg-tracker', type:'action', name:'🥚 Easter Egg Progress', desc:'Tracks achievements you have unlocked.',
+    run: () => toast(`🥚 ${achievements.size}/${TOTAL_ACHIEVEMENTS} secrets found. Keep clicking things.`) },
+  { id:'light-mode', type:'action', name:'☀ Light Mode', desc:'Briefly blinds you, then reconsiders.',
+    run: () => flashLightMode() },
+  { id:'system-check', type:'action', name:'🖥 Run System Requirements Check', desc:'Checks things that are not checkable.',
+    run: () => {
+      showPopup('🖥','SYSTEM REQUIREMENTS CHECK', '<p id="sys-check-lines">Initializing…</p>', 'PLEASE WAIT');
+      const lines = ['Checking RAM… OK', 'Checking GPU… OK', 'Checking Vibes… OK', 'Checking Will To Live… OK', 'Checking Blockchain Compatibility… OK', 'All systems nominal. ✅'];
+      let html = ''; let i = 0;
+      const iv = setInterval(() => {
+        html += lines[i] + '<br>'; const el = document.getElementById('sys-check-lines'); if (el) el.innerHTML = html;
+        i++; if (i >= lines.length) { clearInterval(iv); genericBtn.textContent = 'GREAT'; }
+      }, 400);
+    } },
+  { id:'blockchain-wallet', type:'action', name:'💰 Check LOGI Coin Wallet', desc:'Your balance, such as it is.',
+    run: () => showPopup('💰','LOGI COIN WALLET', `<p>Balance: <strong style="color:#fa0">0.00000001 LOGI</strong></p><p style="color:#666;margin-top:6px;">≈ $0.00 USD. Market cap: imaginary.</p>`, 'COOL') },
+  { id:'delete-account', type:'action', name:'🗑 Try to Delete Your Account', desc:'You do not have an account. Try anyway.',
+    run: () => showPopup('🗑','ARE YOU SURE?', `<p>Deleting your account means losing access to: nothing, this is a free tool with no accounts.</p>`, 'CANCEL DELETION (RECOMMENDED)').then(() => toast('Account not deleted, mostly because it never existed.')) },
+  { id:'rename-mascot', type:'action', name:'📎 Rename The Mascot', desc:'Cloggy will remain Cloggy, regardless.',
+    run: () => showPopup('📎','RENAME CLOGGY', '<input type="text" placeholder="New name…" />', 'SAVE').then(() => toast('Renamed to: Cloggy. (We did not actually change it.)')) },
+  { id:'fake-receipt', type:'action', name:'🧾 View Receipt for Last Run', desc:'Itemized billing for a free program.',
+    run: () => { const steps = (runInterp && runInterp.steps) || stepInterp && stepInterp.steps || Math.floor(Math.random()*200); showPopup('🧾','RECEIPT', `
+      <p>Steps executed: ${steps}</p>
+      <p>Logic Gate Tax (12%): ${(steps*0.12).toFixed(2)} bits</p>
+      <p>Blockchain Mining Fee: 0.00000001 LOGI</p>
+      <p style="margin-top:6px;border-top:1px solid #333;padding-top:6px;">Total: $0.00 — thank you for nothing</p>
+    `, 'PAY (FREE)'); } },
+];
+
+// dad jokes / compliments arrays used above
+const DAD_JOKES = [
+  "Why do programmers prefer dark mode? Because light attracts bugs.",
+  "I told my computer I needed a break, and it said no problem — it'll go to sleep too.",
+  "Why was the logic gate sad? It couldn't NAND-le its emotions.",
+  "Two bits walk into a bar. One says, 'I'll have whatever XOR is having.'",
+  "Why did the stack overflow? It pushed its luck.",
+];
+const COMPLIMENTS = [
+  "Your understanding of bitwise operations is, statistically speaking, above average.",
+  "You have excellent taste in deeply unnecessary software features.",
+  "Your cursor movements suggest natural leadership qualities.",
+  "Somewhere, a NAND gate is proud of you.",
+  "You read this far. That alone puts you in the top percentile of patience.",
+];
+let bugsFixed = 0;
+function keystrokeBeepHandler() { beep(440 + Math.random()*200, 30, 'square'); }
+
+// ── BUILD THE FEATURE PANEL ──────────────────────────────────
+const featurePanelModal = document.getElementById('feature-panel-modal');
+const featurePanelList = document.getElementById('feature-panel-list');
+function buildFeaturePanel() {
+  featurePanelList.innerHTML = '';
+  featureDefs.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'feature-row';
+    if (f.type === 'toggle') {
+      row.innerHTML = `<div><span class="f-name">${f.name}</span><span class="f-desc">${f.desc}</span></div>
+        <div class="feature-switch" id="sw-${f.id}"></div>`;
+      featurePanelList.appendChild(row);
+      const sw = row.querySelector(`#sw-${f.id}`);
+      sw.classList.toggle('on', !!featureState[f.id]);
+      sw.addEventListener('click', () => {
+        featureState[f.id] = !featureState[f.id];
+        sw.classList.toggle('on', featureState[f.id]);
+        if (featureState[f.id] && f.onEnable) f.onEnable();
+        if (!featureState[f.id] && f.onDisable) f.onDisable();
+        toast((featureState[f.id] ? '✅ Enabled: ' : '❌ Disabled: ') + f.name);
+      });
+    } else {
+      row.innerHTML = `<div><span class="f-name">${f.name}</span><span class="f-desc">${f.desc}</span></div>
+        <button class="feature-action-btn">RUN</button>`;
+      row.querySelector('button').addEventListener('click', () => f.run());
+      featurePanelList.appendChild(row);
+    }
+  });
+}
+document.getElementById('btn-feature-panel').addEventListener('click', () => {
+  buildFeaturePanel();
+  featurePanelModal.classList.add('open');
+});
+document.getElementById('feature-panel-close').addEventListener('click', () => featurePanelModal.classList.remove('open'));
+
+// ── WIRE TOGGLE EFFECTS INTO EXISTING FLOWS ───────────────────
+// (confetti / shake / dramatic-run-sound / old-english hook into setStatus & run, already overridden once below)
+const _origSetStatus2 = setStatus;
+setStatus = function(msg, cls) {
+  _origSetStatus2(msg, cls);
+  if (cls === 'ok' && /^DONE/.test(msg)) {
+    bumpSynergy();
+    if (featureState['confetti-success']) fireConfetti();
+  }
+  if (cls === 'err' && featureState['screen-shake-error']) {
+    document.body.classList.add('shake');
+    setTimeout(() => document.body.classList.remove('shake'), 400);
+  }
+};
+
+const _origUpdateDisplay = updateDisplay;
+updateDisplay = function(interp, w, h) {
+  _origUpdateDisplay(interp, w, h);
+  if (featureState['old-english-output'] && textContent.textContent) {
+    textContent.textContent = toOldEnglish(textContent.textContent);
+  }
+};
+function toOldEnglish(s) {
+  return s.replace(/\byou\b/gi,'thou').replace(/\bis\b/gi,'art').replace(/\bthe\b/gi,'ye')
+           .replace(/\bare\b/gi,'art').replace(/\byour\b/gi,'thy') + ' (verily)';
+}
+
+// Dramatic sound + fake 2FA gate get woven into the run gauntlet
+const _origStartRunGauntlet = startRunGauntlet;
+startRunGauntlet = function() {
+  if (featureState['dramatic-run-sound']) { beep(220,150,'sawtooth'); setTimeout(()=>beep(180,150,'sawtooth'),180); setTimeout(()=>beep(140,300,'sawtooth'),360); }
+  if (featureState['fake-2fa-on-run']) {
+    const code = Math.floor(100000 + Math.random()*900000);
+    showPopup('🔐','TWO-FACTOR AUTHENTICATION REQUIRED', `
+      <p>We sent a code to your device. Here it is, for convenience, since we didn't actually send anything:</p>
+      <p style="font-size:20px;color:#0f8;text-align:center;margin:10px 0;letter-spacing:4px;">${code}</p>
+      <input type="text" placeholder="Enter the code above" />
+    `, 'VERIFY').then(() => _origStartRunGauntlet());
+  } else {
+    _origStartRunGauntlet();
+  }
+};
+
+// Mascot insult mode overrides the tip pool
+const INSULTS = [
+  "Your indentation is a war crime. There is no indentation. That's almost worse.",
+  "I've seen better stack management from a Jenga tower.",
+  "Bold of you to assume this will run without errors.",
+  "Your code and I have something in common: neither of us know what we're doing.",
+  "I'm not saying your logic gates are bad, I'm saying I've seen better gates on a farm.",
+];
+const _origShowCloggyTip = showCloggyTip;
+showCloggyTip = function(msg) {
+  if (featureState['insult-mode']) {
+    msg = INSULTS[Math.floor(Math.random()*INSULTS.length)];
+  }
+  _origShowCloggyTip(msg);
+};
+
+window.addEventListener('resize', () => { if (featureState['matrix-rain']) matrixResize(); });
+
+
 setMode('text');
 setupCanvas(32, 32);
 aceEditor.setValue(bundledExamples[0]?.code || `0 0 & . 0 1 & . 1 0 & . 1 1 & . %`, -1);
