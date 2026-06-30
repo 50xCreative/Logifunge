@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LOGIFUNGE</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.min.js"></script>
+  <style>
+    /* ── RESET ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── LAYOUT: nothing scrolls except the editor ── */
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: monospace;
+      font-size: 13px;
+      background: #111;
+      color: #ccc;
+    }
+
+    /* ── TOP BAR ── */
+    #top-bar {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      border-bottom: 1px solid #333;
+      flex-shrink: 0;
+    }
+
+    #top-bar button, #top-bar input, #top-bar select {
+      font-family: monospace;
+      font-size: 12px;
+      background: none;
+      border: 1px solid #444;
+      color: #ccc;
+      padding: 2px 8px;
+      cursor: pointer;
+    }
+    #top-bar button:hover { border-color: #aaa; color: #fff; }
+    #btn-run { border-color: #fa0; color: #fa0; }
+    #btn-run:hover { background: #fa0; color: #000; }
+    #btn-run.running { border-color: #f44; color: #f44; }
+
+    .sep { width: 1px; height: 20px; background: #333; margin: 0 2px; }
+    #spacer { flex: 1; }
+
+    #status { font-size: 11px; color: #666; }
+    #status.ok  { color: #0f8; }
+    #status.err { color: #f44; }
+
+    #speed-wrap, #dir-wrap, #max-wrap {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: #666;
+    }
+    #speed-wrap select, #max-wrap input { min-width: 84px; }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
+    #dir-indicator {
+      color: #fa0;
+      border: 1px solid #333;
+      padding: 2px 6px;
+      font-size: 11px;
+    }
+
+    /* mode toggle */
+    #mode-wrap { display: flex; border: 1px solid #333; }
+    #mode-wrap button {
+      border: none;
+      border-right: 1px solid #333;
+      padding: 2px 8px;
+      color: #555;
+      font-size: 11px;
+    }
+    #mode-wrap button:last-child { border-right: none; }
+    #mode-wrap button.active { background: #222; color: #fa0; }
+
+    /* dim inputs */
+    #dim-wrap { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #555; }
+    #dim-wrap input { width: 40px; text-align: center; padding: 2px 4px; }
+    #dim-wrap.hidden { display: none; }
+
+    /* ── MAIN BODY ── */
+    #body {
+      display: flex;
+      height: calc(100vh - 36px);
+    }
+
+    /* ── EDITOR SIDE ── */
+    #editor-pane {
+      width: 50%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #333;
+    }
+
+    #editor-pane-header {
+      height: 24px;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      gap: 6px;
+      border-bottom: 1px solid #333;
+      font-size: 10px;
+      color: #555;
+      flex-shrink: 0;
+    }
+
+    /* Ace editor fills the rest */
+    #ace-editor {
+      flex: 1;
+      overflow: hidden; /* ace handles its own scroll */
+    }
+
+    #stack-bar {
+      height: 24px;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      gap: 4px;
+      border-top: 1px solid #333;
+      font-size: 10px;
+      color: #555;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    #stack-bar span.val {
+      border: 1px solid #333;
+      padding: 0 4px;
+      color: #0f8;
+      font-size: 10px;
+    }
+
+    /* ── OUTPUT SIDE ── */
+    #display-pane {
+      width: 50%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #display-pane-header {
+      height: 24px;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      border-bottom: 1px solid #333;
+      font-size: 10px;
+      color: #555;
+      flex-shrink: 0;
+    }
+
+    /* text output: no scroll on the pane itself */
+    #text-output {
+      flex: 1;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #0f8;
+      display: none;
+      overflow: hidden; /* no scroll */
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    #text-output.visible { display: block; }
+
+    /* pixel output */
+    #pixel-output {
+      flex: 1;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #pixel-output.visible { display: flex; }
+
+    #canvas-wrap { position: relative; }
+    #pixel-canvas { image-rendering: pixelated; display: block; }
+    #grid-overlay { position: absolute; top: 0; left: 0; pointer-events: none; opacity: 0.15; }
+
+    /* ── HELP MODAL ── */
+    #help-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #help-modal.open { display: flex; }
+
+    #help-box {
+      background: #111;
+      border: 1px solid #444;
+      width: 560px;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 16px 20px;
+      font-size: 12px;
+    }
+
+    #help-box h2 {
+      font-size: 13px;
+      color: #fa0;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #help-close { cursor: pointer; color: #555; font-size: 11px; }
+    #help-close:hover { color: #ccc; }
+
+    .help-section { margin-bottom: 14px; }
+    .help-section h3 { font-size: 10px; color: #555; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px solid #222; padding-bottom: 4px; }
+
+    .ref-table { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 3px 12px; align-items: baseline; }
+    .ref-key { color: #fa0; font-family: monospace; white-space: nowrap; }
+    .ref-desc { color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .help-hint { font-size: 10px; color: #444; margin-top: 12px; }
+
+    .ace_active-cell {
+      background: rgba(250, 160, 0, 0.18) !important;
+      box-shadow: inset 0 0 0 1px rgba(250, 160, 0, 0.45);
+    }
+
+    /* ── EXAMPLES inside help ── */
+    .example-card {
+      border: 1px solid #2a2a2a;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+    .example-card:hover { border-color: #555; }
+    .example-name { color: #fa0; font-size: 11px; margin-bottom: 2px; }
+    .example-desc { color: #555; font-size: 10px; margin-bottom: 4px; }
+    .example-code { font-family: monospace; font-size: 11px; color: #0f8; background: #0a0a0a; padding: 4px 6px; white-space: pre; overflow-x: auto; }
+  </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="top-bar">
+  <span style="color:#fa0;font-size:13px;font-weight:bold;letter-spacing:1px">LOGIFUNGE</span>
+  <div class="sep"></div>
+  <button id="btn-run">▶ RUN</button>
+  <button id="btn-step">STEP</button>
+  <button id="btn-clear">CLEAR OUTPUT</button>
+  <div class="sep"></div>
+  <div id="mode-wrap">
+    <button id="mode-text" class="active">TEXT</button>
+    <button id="mode-pixel">PIXEL</button>
+  </div>
+  <div class="sep"></div>
+  <div id="speed-wrap">
+    <label for="speed-select">SPEED</label>
+    <select id="speed-select">
+      <option value="1">1/s</option>
+      <option value="2">2/s</option>
+      <option value="5">5/s</option>
+      <option value="10" selected>10/s</option>
+      <option value="25">25/s</option>
+      <option value="50">50/s</option>
+      <option value="100">100/s</option>
+      <option value="max">MAX</option>
+      <option value="turbo">TURBO</option>
+    </select>
+  </div>
+  <div id="dir-wrap">
+    <span id="dir-indicator">DIR &gt;</span>
+  </div>
+  <div id="dim-wrap">
+    W <input id="inp-w" type="number" value="32" min="1" max="256" />
+    H <input id="inp-h" type="number" value="32" min="1" max="256" />
+  </div>
+  <div id="max-wrap">
+    <label for="max-steps">MAX STEPS</label>
+    <input id="max-steps" type="number" value="1000000" min="1000" step="1000" />
+  </div>
+  <div id="spacer"></div>
+  <span id="status">READY</span>
+  <div class="sep"></div>
+  <button id="btn-help">?</button>
+</div>
+
+<!-- BODY -->
+<div id="body">
+
+  <!-- EDITOR PANE -->
+  <div id="editor-pane">
+    <div id="editor-pane-header">SOURCE</div>
+    <div id="ace-editor"></div>
+    <div id="stack-bar">
+      <span style="color:#444;margin-right:4px">STACK</span>
+      <span id="stack-vals" style="color:#333">empty</span>
+    </div>
+  </div>
+
+  <!-- DISPLAY PANE -->
+  <div id="display-pane">
+    <div id="display-pane-header">OUTPUT</div>
+
+    <div id="text-output">
+      <div id="text-content"></div>
+    </div>
+
+    <div id="pixel-output" class="visible">
+      <div id="canvas-wrap">
+        <canvas id="pixel-canvas"></canvas>
+        <canvas id="grid-overlay"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HELP / REFERENCE MODAL -->
+<div id="help-modal">
+  <div id="help-box">
+    <h2>
+      LOGIFUNGE REFERENCE
+      <span id="help-close">✕ ESC</span>
+    </h2>
+
+    <div class="help-section">
+      <h3>Direction</h3>
+      <div class="ref-table">
+        <span class="ref-key">&gt;</span><span class="ref-desc">move right</span>
+        <span class="ref-key">&lt;</span><span class="ref-desc">move left</span>
+        <span class="ref-key">^</span><span class="ref-desc">move up</span>
+        <span class="ref-key">v</span><span class="ref-desc">move down</span>
+        <span class="ref-key">?</span><span class="ref-desc">random direction</span>
+        <span class="ref-key">#</span><span class="ref-desc">trampoline (skip next)</span>
+      </div>
+    </div>
+
+    <div class="help-section">
+      <h3>Logic Gates</h3>
+      <div class="ref-table">
+        <span class="ref-key">&amp;</span><span class="ref-desc">AND(a, b)</span>
+        <span class="ref-key">|</span><span class="ref-desc">OR(a, b)</span>
+        <span class="ref-key">~</span><span class="ref-desc">NOT(a)</span>
+        <span class="ref-key">@</span><span class="ref-desc">XOR(a, b)</span>
+        <span class="ref-key">N</span><span class="ref-desc">NAND(a, b)</span>
+        <span class="ref-key">R</span><span class="ref-desc">NOR(a, b)</span>
+        <span class="ref-key">X</span><span class="ref-desc">XNOR(a, b)</span>
+      </div>
+    </div>
+
+    <div class="help-section">
+      <h3>Stack</h3>
+      <div class="ref-table">
+        <span class="ref-key">0-9</span><span class="ref-desc">push digit</span>
+        <span class="ref-key">[n]</span><span class="ref-desc">push number n (e.g. [42])</span>
+        <span class="ref-key">:</span><span class="ref-desc">duplicate top</span>
+        <span class="ref-key">\</span><span class="ref-desc">swap top two</span>
+        <span class="ref-key">$</span><span class="ref-desc">pop and discard</span>
+        <span class="ref-key">+−*/</span><span class="ref-desc">arithmetic</span>
+      </div>
+    </div>
+
+    <div class="help-section">
+      <h3>Output</h3>
+      <div class="ref-table">
+        <span class="ref-key">.</span><span class="ref-desc">print top as number</span>
+        <span class="ref-key">=</span><span class="ref-desc">print top as ASCII character (65 → A)</span>
+        <span class="ref-key">,</span><span class="ref-desc">push pixel: pop x,y,val(0/1) → write</span>
+        <span class="ref-key">'</span><span class="ref-desc">pull pixel: pop x,y → push value</span>
+        <span class="ref-key">"</span><span class="ref-desc">string mode (push ASCII)</span>
+        <span class="ref-key">%</span><span class="ref-desc">END program</span>
+      </div>
+    </div>
+
+    <div class="help-section">
+      <h3>Control Flow</h3>
+      <div class="ref-table">
+        <span class="ref-key">_</span><span class="ref-desc">horizontal if (0→right, else left)</span>
+        <span class="ref-key">!</span><span class="ref-desc">vertical if (0→down, else up)</span>
+        <span class="ref-key">g</span><span class="ref-desc">get cell(x, y)</span>
+        <span class="ref-key">p</span><span class="ref-desc">put cell(v, x, y)</span>
+        <span class="ref-key">:[name]</span><span class="ref-desc">define subroutine (body ends with r)</span>
+        <span class="ref-key">;[name]</span><span class="ref-desc">call subroutine</span>
+        <span class="ref-key">r</span><span class="ref-desc">return from subroutine</span>
+        <span class="ref-key">{[name]</span><span class="ref-desc">loop top marker</span>
+        <span class="ref-key">}[name]</span><span class="ref-desc">loop bottom: pop; jump if nonzero</span>
+      </div>
+    </div>
+
+    <div class="help-section">
+      <h3>Examples — click to load</h3>
+      <div id="example-list"></div>
+    </div>
+
+    <div class="help-hint">Press <strong style="color:#fa0">?</strong> or <strong style="color:#fa0">/</strong> to toggle · <strong style="color:#fa0">Esc</strong> to close · <strong style="color:#fa0">Ctrl+Enter</strong> to run</div>
+  </div>
+</div>
+
+<script src="examples.js"></script>
+<script src="interpreter.js"></script>
+<script>
+// ── ACE EDITOR SETUP ──────────────────────────────────────────
+const aceEditor = ace.edit('ace-editor');
+aceEditor.setTheme('ace/theme/tomorrow_night');
+aceEditor.session.setMode('ace/mode/text');
+aceEditor.setOptions({
+  fontSize: '13px',
+  fontFamily: 'monospace',
+  showPrintMargin: false,
+  highlightActiveLine: true,
+  wrap: false,
+  tabSize: 2,
+  useSoftTabs: true,
+});
+// Ace handles its own scrolling — the pane just clips it
+
+// ── STATE ─────────────────────────────────────────────────────
+let outputMode = 'text';
+let stepInterp = null, stepW = 32, stepH = 32;
+let runInterp = null;
+let runTimer = null;
+let activeCellMarker = null;
+
+const bundledExamples = window.examples || [];
+
+// ── DOM REFS ──────────────────────────────────────────────────
+const textOutput  = document.getElementById('text-output');
+const textContent = document.getElementById('text-content');
+const pixelOutput = document.getElementById('pixel-output');
+const canvas      = document.getElementById('pixel-canvas');
+const gridCanvas  = document.getElementById('grid-overlay');
+const statusEl    = document.getElementById('status');
+const stackVals   = document.getElementById('stack-vals');
+const dimWrap     = document.getElementById('dim-wrap');
+const inpW        = document.getElementById('inp-w');
+const inpH        = document.getElementById('inp-h');
+const btnRun      = document.getElementById('btn-run');
+const btnStep     = document.getElementById('btn-step');
+const btnClear    = document.getElementById('btn-clear');
+const btnHelp     = document.getElementById('btn-help');
+const modeBtnText = document.getElementById('mode-text');
+const modeBtnPixel= document.getElementById('mode-pixel');
+const speedSelect = document.getElementById('speed-select');
+const maxStepsInput = document.getElementById('max-steps');
+const dirIndicator= document.getElementById('dir-indicator');
+const helpModal   = document.getElementById('help-modal');
+const helpClose   = document.getElementById('help-close');
+const exampleList = document.getElementById('example-list');
+const ctx         = canvas.getContext('2d');
+const gCtx        = gridCanvas.getContext('2d');
+
+// ── MODE ──────────────────────────────────────────────────────
+function setMode(m) {
+  outputMode = m;
+  modeBtnText.classList.toggle('active', m === 'text');
+  modeBtnPixel.classList.toggle('active', m === 'pixel');
+  textOutput.classList.toggle('visible', m === 'text');
+  pixelOutput.classList.toggle('visible', m === 'pixel');
+  dimWrap.classList.toggle('hidden', m === 'text');
+}
+modeBtnText.addEventListener('click', () => setMode('text'));
+modeBtnPixel.addEventListener('click', () => setMode('pixel'));
+
+// ── CANVAS ────────────────────────────────────────────────────
+function setupCanvas(w, h) {
+  const maxW = pixelOutput.clientWidth  - 24;
+  const maxH = pixelOutput.clientHeight - 24;
+  const scale = Math.max(1, Math.min(Math.floor(maxW / w), Math.floor(maxH / h)));
+  canvas.width = w; canvas.height = h;
+  canvas.style.width  = (w * scale) + 'px';
+  canvas.style.height = (h * scale) + 'px';
+  gridCanvas.width  = w * scale; gridCanvas.height = h * scale;
+  gridCanvas.style.width  = (w * scale) + 'px';
+  gridCanvas.style.height = (h * scale) + 'px';
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, w, h);
+  gCtx.clearRect(0, 0, w * scale, h * scale);
+  gCtx.strokeStyle = '#0f8';
+  gCtx.lineWidth = 0.5;
+  for (let x = 0; x <= w; x++) { gCtx.beginPath(); gCtx.moveTo(x*scale,0); gCtx.lineTo(x*scale,h*scale); gCtx.stroke(); }
+  for (let y = 0; y <= h; y++) { gCtx.beginPath(); gCtx.moveTo(0,y*scale); gCtx.lineTo(w*scale,y*scale); gCtx.stroke(); }
+  return scale;
+}
+
+function drawPixels(pixels, w, h) {
+  const idata = ctx.createImageData(w, h);
+  for (let i = 0; i < idata.data.length; i += 4) { idata.data[i]=17; idata.data[i+1]=17; idata.data[i+2]=17; idata.data[i+3]=255; }
+  for (const p of pixels) {
+    if (p.x < 0 || p.x >= w || p.y < 0 || p.y >= h) continue;
+    const idx = (p.y * w + p.x) * 4;
+    if (p.on) {
+      const v = Math.min(255, Math.max(0, p.value));
+      idata.data[idx]   = v > 1 ? 0   : 255;
+      idata.data[idx+1] = v > 1 ? v   : 170;
+      idata.data[idx+2] = v > 1 ? 136 : 0;
+      idata.data[idx+3] = 255;
+    } else {
+      idata.data[idx]=20; idata.data[idx+1]=24; idata.data[idx+2]=36; idata.data[idx+3]=255;
+    }
+  }
+  ctx.putImageData(idata, 0, 0);
+}
+
+// ── STATUS / STACK ────────────────────────────────────────────
+function setStatus(msg, cls) {
+  statusEl.textContent = msg;
+  statusEl.className = cls || '';
+}
+
+function setDirectionLabel(dir) {
+  const arrow = dir && dir.x === 1 ? '>' : dir && dir.x === -1 ? '<' : dir && dir.y === 1 ? 'v' : '^';
+  dirIndicator.textContent = `DIR ${arrow || '>'}`;
+}
+
+function clearActiveCellHighlight() {
+  if (activeCellMarker !== null) {
+    aceEditor.session.removeMarker(activeCellMarker);
+    activeCellMarker = null;
+  }
+  aceEditor.selection.clearSelection();
+}
+
+function highlightActiveCell(interp) {
+  clearActiveCellHighlight();
+  if (!interp || !interp.ip) return;
+  const { x, y } = interp.ip;
+  if (y < 0 || x < 0) return;
+  const row = Math.max(0, y);
+  const col = Math.max(0, x);
+  const range = new ace.Range(row, col, row, Math.min(aceEditor.session.getLine(row).length, col + 1));
+  activeCellMarker = aceEditor.session.addMarker(range, 'ace-active-cell', 'text', false);
+  aceEditor.selection.setSelectionRange({ start: { row, column: col }, end: { row, column: Math.min(aceEditor.session.getLine(row).length, col + 1) } }, false);
+  aceEditor.renderer.scrollCursorIntoView();
+  setDirectionLabel(interp.dir);
+}
+
+function showStack(stack) {
+  if (!stack || stack.length === 0) {
+    stackVals.innerHTML = '<span style="color:#333">empty</span>';
+  } else {
+    stackVals.innerHTML = stack.map(v => `<span class="val">${v}</span>`).join(' ');
+  }
+}
+
+// ── TURBO WORKER (persistent — created once, reused) ─────────
+// Pixel data is returned as a transferable Uint32Array to avoid copying
+// an array of objects. Format: [x0, y0, val0, x1, y1, val1, ...]
+let turboWorker = null;
+let turboWorkerBusy = false;
+
+function getTurboWorker() {
+  if (turboWorker) return turboWorker;
+  const workerSrc = `
+    importScripts(${JSON.stringify(new URL('interpreter.js', location.href).href)});
+    self.onmessage = function(e) {
+      const { code, w, h, maxSteps } = e.data;
+      const interp = new BefungeLogicInterpreter(code, w, h, maxSteps);
+      const result = interp.run();
+
+      // Encode pixels as a flat Uint32Array [x, y, val, x, y, val, ...]
+      // so it can be transferred zero-copy instead of cloned as an object array.
+      const pixelBuf = new Uint32Array(result.pixels.length * 3);
+      for (let i = 0; i < result.pixels.length; i++) {
+        const p = result.pixels[i];
+        pixelBuf[i * 3]     = p.x;
+        pixelBuf[i * 3 + 1] = p.y;
+        pixelBuf[i * 3 + 2] = p.on ? 1 : 0;
+      }
+
+      self.postMessage(
+        { textOutput: result.textOutput, pixelBuf, steps: result.steps,
+          error: result.error, stack: result.stack },
+        [pixelBuf.buffer]   // transfer ownership — zero copy
+      );
+    };
+  `;
+  const blob = new Blob([workerSrc], { type: 'application/javascript' });
+  const url = URL.createObjectURL(blob);
+  turboWorker = new Worker(url);
+  URL.revokeObjectURL(url);
+  return turboWorker;
+}
+
+function isHighSpeed() {
+  const v = speedSelect.value;
+  return v === 'max' || v === 'turbo' || parseInt(v, 10) >= 25;
+}
+
+// ── RUN ───────────────────────────────────────────────────────
+function getStepDelayMs() {
+  const value = speedSelect.value;
+  if (value === 'max' || value === 'turbo') return 0;
+  return Math.max(0, 1000 / parseInt(value, 10));
+}
+
+function getChunkSize() {
+  // For named speeds the delay between ticks already controls the rate,
+  // so we always execute exactly 1 step per tick.
+  // Only in MAX mode (zero delay) do we batch steps to avoid starving the event loop.
+  return speedSelect.value === 'max' ? 100 : 1;
+}
+
+function getMaxSteps() {
+  return Math.max(1000, parseInt(maxStepsInput.value) || 1000000);
+}
+
+function stopAutoRun(terminateWorker = false) {
+  if (runTimer) {
+    clearTimeout(runTimer);
+    runTimer = null;
+  }
+  if (turboWorkerBusy) {
+    if (terminateWorker && turboWorker) {
+      // Hard stop: kill the worker so it stops mid-run, recreate next time
+      turboWorker.terminate();
+      turboWorker = null;
+    }
+    turboWorkerBusy = false;
+  }
+  if (isHighSpeed()) clearActiveCellHighlight();
+  btnRun.classList.remove('running');
+  btnRun.textContent = '▶ RUN';
+}
+
+function isHighSpeed() {
+  const v = speedSelect.value;
+  return v === 'max' || parseInt(v, 10) >= 25;
+}
+
+function updateDisplay(interp, w, h) {
+  const text = interp.output.trimEnd();
+  textContent.textContent = text || '— no text output (use . to print) —';
+  if (outputMode === 'text') textContent.style.color = text ? '#0f8' : '#444';
+  setupCanvas(w, h);
+  if (interp.pixels.length) drawPixels(interp.pixels, w, h);
+  showStack(interp.stack);
+  if (!isHighSpeed()) {
+    highlightActiveCell(interp);
+  }
+}
+
+function run() {
+  if (runTimer || turboWorkerBusy) {
+    stopAutoRun(true);  // hard stop — terminate worker if busy
+    setStatus('RUN STOPPED');
+    return;
+  }
+
+  const code = aceEditor.getValue();
+  if (!code.trim()) { setStatus('NO CODE'); return; }
+  const execCode = code;
+  const w = Math.max(1, Math.min(256, parseInt(inpW.value) || 32));
+  const h = Math.max(1, Math.min(256, parseInt(inpH.value) || 32));
+
+  setStatus('RUNNING…');
+  btnRun.classList.add('running');
+  btnRun.textContent = '■ STOP';
+
+  // ── TURBO: run entirely inside a persistent Web Worker ───────
+  if (speedSelect.value === 'turbo') {
+    const worker = getTurboWorker();
+    turboWorkerBusy = true;
+
+    worker.onmessage = (e) => {
+      turboWorkerBusy = false;
+      const { textOutput, pixelBuf, steps, error, stack } = e.data;
+
+      // Decode transferable pixel buffer [x, y, val, ...] back into pixel objects
+      const pixels = [];
+      for (let i = 0; i < pixelBuf.length; i += 3) {
+        const on = pixelBuf[i + 2] !== 0;
+        pixels.push({ x: pixelBuf[i], y: pixelBuf[i + 1], on, value: on ? 1 : 0 });
+      }
+
+      const text = textOutput;
+      textContent.textContent = text || '— no text output (use . to print) —';
+      if (outputMode === 'text') textContent.style.color = text ? '#0f8' : '#444';
+      setupCanvas(w, h);
+      if (pixels.length) drawPixels(pixels, w, h);
+      showStack(stack);
+      clearActiveCellHighlight();
+      btnRun.classList.remove('running');
+      btnRun.textContent = '▶ RUN';
+      if (error) {
+        setStatus(`⚠ ${error}`, 'err');
+      } else {
+        setStatus(`DONE — ${steps} steps`, 'ok');
+      }
+    };
+
+    worker.onerror = (e) => {
+      turboWorkerBusy = false;
+      turboWorker = null; // force recreation on next run
+      btnRun.classList.remove('running');
+      btnRun.textContent = '▶ RUN';
+      setStatus('WORKER ERROR: ' + e.message, 'err');
+    };
+
+    setupCanvas(w, h);
+    worker.postMessage({ code: execCode, w, h, maxSteps: getMaxSteps() });
+    return;
+  }
+
+  // ── Normal tick loop (all named speeds + MAX) ────────────────
+  runInterp = new BefungeLogicInterpreter(execCode, w, h, getMaxSteps());
+  runInterp.running = true;
+  updateDisplay(runInterp, w, h);
+
+  const tick = () => {
+    if (!runInterp || !runInterp.running) {
+      stopAutoRun();
+      return;
+    }
+
+    try {
+      const limit = getMaxSteps();
+      if (runInterp.maxSteps !== limit) runInterp.maxSteps = limit;
+      let cont = true;
+      const chunkSize = getChunkSize();
+      for (let i = 0; i < chunkSize; i++) {
+        if (!runInterp.running) break;
+        if (runInterp.steps >= runInterp.maxSteps) {
+          runInterp.error = `Step limit (${runInterp.maxSteps}) reached — possible infinite loop`;
+          updateDisplay(runInterp, w, h);
+          setStatus(`⚠ ${runInterp.error}`, 'err');
+          stopAutoRun();
+          return;
+        }
+        cont = runInterp._step();
+        runInterp.steps++;
+        if (runInterp.error) {
+          updateDisplay(runInterp, w, h);
+          setStatus(`⚠ ${runInterp.error}`, 'err');
+          stopAutoRun();
+          return;
+        }
+        if (!cont || !runInterp.running) break;
+      }
+      updateDisplay(runInterp, w, h);
+      if (!cont || !runInterp.running) {
+        setStatus(`DONE — ${runInterp.steps} steps`, 'ok');
+        stopAutoRun();
+        return;
+      }
+      setStatus(`RUNNING… ${runInterp.steps} steps`, 'ok');
+      const delay = getStepDelayMs();
+      runTimer = setTimeout(tick, delay);
+    } catch (e) {
+      setStatus('ERROR: ' + e.message, 'err');
+      stopAutoRun();
+    }
+  };
+
+  tick();
+}
+
+// ── STEP ──────────────────────────────────────────────────────
+function stepOnce() {
+  if (!stepInterp || !stepInterp.running) {
+    const code = aceEditor.getValue();
+    if (!code.trim()) { setStatus('NO CODE'); return; }
+    stepW = Math.max(1, Math.min(256, parseInt(inpW.value) || 32));
+    stepH = Math.max(1, Math.min(256, parseInt(inpH.value) || 32));
+    stepInterp = new BefungeLogicInterpreter(code, stepW, stepH, getMaxSteps());
+    stepInterp.running = true;
+    setupCanvas(stepW, stepH);
+    setStatus('STEP MODE');
+  }
+  if (!stepInterp.running) { setStatus('DONE', 'ok'); return; }
+  const limit = getMaxSteps();
+  if (stepInterp.maxSteps !== limit) stepInterp.maxSteps = limit;
+  if (stepInterp.steps >= stepInterp.maxSteps) {
+    stepInterp.error = `Step limit (${stepInterp.maxSteps}) reached — possible infinite loop`;
+    updateDisplay(stepInterp, stepW, stepH);
+    setStatus(`⚠ ${stepInterp.error}`, 'err');
+    stepInterp = null;
+    return;
+  }
+  const cont = stepInterp._step();
+  stepInterp.steps++;
+  updateDisplay(stepInterp, stepW, stepH);
+  setStatus(`STEP ${stepInterp.steps} — IP(${stepInterp.ip.x},${stepInterp.ip.y})`);
+  if (!cont || !stepInterp.running) { setStatus(`DONE — ${stepInterp.steps} steps`, 'ok'); stepInterp = null; }
+}
+
+// ── CLEAR OUTPUT ─────────────────────────────────────────────
+function clearOutput() {
+  if (outputMode === 'text') {
+    textContent.textContent = '';
+    textContent.style.color = '#444';
+    setStatus('TEXT OUTPUT CLEARED');
+  } else {
+    setupCanvas(parseInt(inpW.value)||32, parseInt(inpH.value)||32);
+    setStatus('PIXEL OUTPUT CLEARED');
+  }
+}
+
+// ── HELP MODAL ────────────────────────────────────────────────
+function buildExamples() {
+  exampleList.innerHTML = '';
+  bundledExamples.forEach(ex => {
+    const card = document.createElement('div');
+    card.className = 'example-card';
+    card.innerHTML = `
+      <div class="example-name">${ex.name} <span style="color:#444;font-size:9px">[${ex.mode.toUpperCase()}]</span></div>
+      <div class="example-desc">${ex.desc}</div>
+      <div class="example-code">${ex.code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+    `;
+    card.addEventListener('click', () => {
+      aceEditor.setValue(ex.code, -1);
+      setMode(ex.mode);
+      closeHelp();
+      setStatus('EXAMPLE LOADED');
+    });
+    exampleList.appendChild(card);
+  });
+}
+
+function openHelp()  { buildExamples(); helpModal.classList.add('open'); }
+function closeHelp() { helpModal.classList.remove('open'); }
+
+btnHelp.addEventListener('click', openHelp);
+helpClose.addEventListener('click', closeHelp);
+helpModal.addEventListener('click', e => { if (e.target === helpModal) closeHelp(); });
+
+// ── KEYBOARD ──────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.key === '?' || e.key === '/') && !e.ctrlKey && !e.metaKey && document.activeElement !== aceEditor.textInput.getElement()) {
+    e.preventDefault(); helpModal.classList.contains('open') ? closeHelp() : openHelp(); return;
+  }
+  if (e.key === 'Escape') { closeHelp(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); }
+});
+
+// Ace command for Ctrl+Enter
+aceEditor.commands.addCommand({
+  name: 'run',
+  bindKey: { win: 'Ctrl-Enter', mac: 'Command-Enter' },
+  exec: run,
+});
+
+// ── WIRE BUTTONS ──────────────────────────────────────────────
+btnRun.addEventListener('click', run);
+btnStep.addEventListener('click', stepOnce);
+btnClear.addEventListener('click', clearOutput);
+inpW.addEventListener('change', () => setupCanvas(parseInt(inpW.value)||32, parseInt(inpH.value)||32));
+inpH.addEventListener('change', () => setupCanvas(parseInt(inpW.value)||32, parseInt(inpH.value)||32));
+
+// ── INIT ──────────────────────────────────────────────────────
+setMode('text');
+setupCanvas(32, 32);
+aceEditor.setValue(bundledExamples[0]?.code || `0 0 & . 0 1 & . 1 0 & . 1 1 & . %`, -1);
+setDirectionLabel({ x: 1, y: 0 });
+clearActiveCellHighlight();
+setStatus('READY — press ? for help');
+</script>
+</body>
+</html>
