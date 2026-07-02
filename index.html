@@ -1,11 +1,436 @@
 <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LOGIFUNGE — an esoteric logic-gate programming language IDE</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+  <link rel="stylesheet" href="v4/style.css" />
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: #f8f8f2;
+    }
+
+    #top-bar {
+      position: relative;
+      overflow: hidden;
+      background: rgba(12, 12, 18, 0.88);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(10px);
+      /* height/opacity/padding are transitioned inline via JS once the
+         intrinsic height is measured, so a plain height:auto can animate */
+    }
+
+    #body {
+      display: flex;
+      gap: 18px;
+      padding: 22px;
+      min-height: calc(100vh - 96px);
+      transition: gap 1.1s ease, padding 1.1s ease, min-height 0.9s ease;
+      align-items: stretch;
+    }
+
+    #editor-pane {
+      flex: 0 0 44%;
+      min-width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: flex 1.1s cubic-bezier(0.65, 0, 0.35, 1), min-width 1.1s cubic-bezier(0.65, 0, 0.35, 1),
+        opacity 0.9s ease, padding 1.1s ease, margin 1.1s ease;
+    }
+
+    #display-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #display-pane-header {
+      transition: opacity 0.6s ease, margin 0.7s ease;
+    }
+
+    #top-bar #run-hint {
+      color: rgba(255, 255, 255, 0.66);
+      transition: color 0.3s ease;
+    }
+
+    #top-bar #run-hint.active {
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    /* ---- Stage 1: editor pane disappears, output pane widens ---- */
+    body.collapsing #editor-pane {
+      flex: 0 0 0%;
+      min-width: 0;
+      opacity: 0;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    body.collapsing #body {
+      gap: 0;
+    }
+
+    /* ---- Stage 2: output label fades (top bar height handled inline via JS) ---- */
+    body.topbar-hidden #display-pane-header {
+      opacity: 0;
+      margin-bottom: -1.4em;
+      pointer-events: none;
+    }
+
+    /* ---- Stage 4: output text grows and glides to center, becoming underlined links ----
+       Geometry (top/left/transform) is driven by inline styles set in JS (see
+       centerOutput()) so the FLIP-style animation isn't shadowed by them; this
+       transition declaration is what makes those inline-style changes animate. */
+    #text-content {
+      transition: top 3.0s cubic-bezier(0.22, 1, 0.36, 1), left 3.0s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 3.0s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #text-content a {
+      color: #f8f8f2;
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.7s ease 0.35s, color 0.7s ease 0.35s;
+      padding-bottom: 2px;
+    }
+
+    #text-content.linked a {
+      border-color: #fa0;
+    }
+
+    #text-content.linked a:hover {
+      color: #fa0;
+    }
+
+    /* Used only while ESC-skipping straight to the finished state: neutralizes
+       every transition (including inline ones set from JS, via !important) so
+       the whole sequence — editor gone, top bar gone, text centered + linked —
+       appears in its final form with no animation playing out. */
+    .no-transition,
+    .no-transition * {
+      transition: none !important;
+    }
+
+    @media (max-width: 900px) {
+      #body {
+        flex-direction: column;
+        min-height: auto;
+      }
+
+      #editor-pane,
+      #display-pane {
+        flex: 1 1 100%;
+      }
+    }
+  </style>
+</head>
 <body>
-    <a href="/v1/index.html">v1</a>
-    <a href="/v2/index.html">v2</a>
-    <a href="/v3/index.html">v3</a>
-    <a href="/v4/index.html">v4</a>
+  <div id="top-bar">
+    <span style="color:#fa0;font-size:13px;font-weight:bold;letter-spacing:1px">LOGIFUNGE</span>
+    <div class="sep"></div>
+    <button id="btn-run">▶ RUN</button>
+    <button id="btn-step">STEP</button>
+    <button id="btn-clear">CLEAR OUTPUT</button>
+    <div class="sep"></div>
+    <div id="mode-wrap">
+      <button id="mode-text" class="active">TEXT</button>
+      <button id="mode-pixel">PIXEL</button>
+      <button id="mode-both">BOTH</button>
+    </div>
+    <div class="sep"></div>
+    <div id="speed-wrap">
+      <label for="speed-select">SPEED</label>
+      <select id="speed-select" disabled>
+        <option value="1">1/s</option>
+        <option value="2">2/s</option>
+        <option value="5">5/s</option>
+        <option value="10" selected>25/s</option>
+      </select>
+    </div>
+    <div id="spacer"></div>
+    <span id="status">TYPE TO RUN…</span>
+    <div class="sep"></div>
+    <span id="run-hint">ESC to skip animation</span>
+  </div>
+
+  <div id="body">
+    <div id="editor-pane">
+      <div id="editor-pane-header">SOURCE</div>
+      <div id="ace-editor"></div>
+      <div id="stack-bar">
+        <span style="color:#444;margin-right:4px">STACK</span>
+        <span id="stack-vals" style="color:#333">empty</span>
+      </div>
+    </div>
+
+    <div id="display-pane">
+      <div id="display-pane-header">OUTPUT</div>
+      <div id="text-output" class="visible">
+        <div id="text-content">Waiting for RUN…</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.min.js"></script>
+  <script src="interpreter.js"></script>
+  <script>
+    const program = '>0{[c]"v"=1+:.:4-}[c]%';
+    const pageBody = document.body;
+    const runButton = document.getElementById('btn-run');
+    const statusText = document.getElementById('status');
+    const runHint = document.getElementById('run-hint');
+    const editorPane = document.getElementById('editor-pane');
+    const displayPane = document.getElementById('display-pane');
+    const displayHeader = document.getElementById('display-pane-header');
+    const topBar = document.getElementById('top-bar');
+    const textContent = document.getElementById('text-content');
+
+    let stepCount = 0;
+    let stage = 'typing';
+
+    const aceEditor = ace.edit('ace-editor');
+    aceEditor.setTheme('ace/theme/tomorrow_night');
+    aceEditor.session.setMode('ace/mode/text');
+    aceEditor.setOptions({
+      fontSize: '13px',
+      fontFamily: 'monospace',
+      showPrintMargin: false,
+      highlightActiveLine: true,
+      wrap: false,
+      tabSize: 2,
+      useSoftTabs: true,
+      readOnly: true,
+    });
+    aceEditor.renderer.setScrollMargin(10, 10, 10, 10);
+    aceEditor.setValue('', -1);
+
+    let typedIndex = 0;
+    let typingTimer = null;
+    let animationSkipped = false;
+    let animator = null;
+    let interpreter = null;
+    let completed = false;
+    let zoomDone = false;
+    let pendingZoomTimeouts = [];
+    let finalOutput = '';
+
+    function setStage(text, stageName = '') {
+      stage = stageName;
+      statusText.textContent = text;
+    }
+
+    function renderTextOutput(text) {
+      textContent.parentElement.classList.add('visible');
+      textContent.textContent = text || 'Running…';
+    }
+
+    // Stage 1: the editor pane disappears and the output pane widens to fill its place.
+    function collapseEditor() {
+      pageBody.classList.add('collapsing');
+    }
+
+    // Stage 2: the top bar (and output label) shrink away, measuring the real
+    // height first so the height transition has something concrete to animate from.
+    function collapseTopBar() {
+      const h = topBar.getBoundingClientRect().height;
+      topBar.style.height = `${h}px`;
+      topBar.style.overflow = 'hidden';
+      void topBar.offsetWidth;
+      requestAnimationFrame(() => {
+        topBar.style.transition = 'height 0.9s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.7s ease, ' +
+          'padding-top 0.9s ease, padding-bottom 0.9s ease, border-color 0.7s ease';
+        topBar.style.height = '0px';
+        topBar.style.opacity = '0';
+        topBar.style.paddingTop = '0px';
+        topBar.style.paddingBottom = '0px';
+        topBar.style.borderBottomColor = 'transparent';
+        topBar.style.pointerEvents = 'none';
+      });
+      pageBody.classList.add('topbar-hidden');
+    }
+
+    // Stage 4: the leftover output text grows in place and glides to the center
+    // of the screen, turning into underlined, clickable version links.
+    function centerOutput(output, instant = false) {
+      const tokens = output.trim().split(/\s+/).filter(Boolean);
+      if (!tokens.length) {
+        textContent.textContent = 'No output';
+        return;
+      }
+      const rect = textContent.getBoundingClientRect();
+      const computed = getComputedStyle(textContent);
+      // Reparent to <body> directly so ancestor panes' `overflow: hidden`
+      // (set on #text-output / html / body for the no-scroll IDE layout)
+      // can't clip the text once it grows past their bounds.
+      textContent.style.color = computed.color;
+      textContent.style.fontFamily = computed.fontFamily;
+      textContent.style.fontSize = computed.fontSize;
+      textContent.style.lineHeight = computed.lineHeight;
+      textContent.style.whiteSpace = computed.whiteSpace;
+      textContent.style.position = 'fixed';
+      textContent.style.margin = '0';
+      textContent.style.zIndex = '50';
+      textContent.style.top = `${rect.top}px`;
+      textContent.style.left = `${rect.left}px`;
+      textContent.style.transform = 'translate(0, 0) scale(1)';
+      document.body.appendChild(textContent);
+
+      textContent.innerHTML = tokens.map(token => {
+        const href = token.startsWith('v') ? `/${token}/index.html` : '#';
+        return `<a href="${href}">${token}</a>`;
+      }).join(' ');
+
+      const scale = window.matchMedia('(max-width: 900px)').matches ? 1.4 : 1.9;
+      void textContent.offsetWidth; // flush the start position before animating
+
+      if (instant) {
+        textContent.classList.add('centering', 'linked');
+        textContent.style.top = '50%';
+        textContent.style.left = '50%';
+        textContent.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        return;
+      }
+
+      requestAnimationFrame(() => {
+        textContent.classList.add('centering');
+        textContent.style.top = '50%';
+        textContent.style.left = '50%';
+        textContent.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        setTimeout(() => textContent.classList.add('linked'), 250);
+      });
+    }
+
+    // Applies the fully finished, zoomed-in state immediately: disables every
+    // transition, runs all three stages back-to-back, then re-enables
+    // transitions on a later frame so things like link hover still animate.
+    function applyInstantFinal(output) {
+      pageBody.classList.add('no-transition');
+      collapseEditor();
+      collapseTopBar();
+      centerOutput(output, true);
+      zoomDone = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => pageBody.classList.remove('no-transition'));
+      });
+    }
+
+    function finalizeRun(output, instant = false) {
+      completed = true;
+      zoomDone = false;
+      finalOutput = output;
+      aceEditor.setReadOnly(true);
+      renderTextOutput(output);
+      setStage('COMPLETE · STEPS: ' + stepCount, 'finished');
+
+      if (instant) {
+        applyInstantFinal(output);
+        return;
+      }
+
+      pendingZoomTimeouts = [
+        setTimeout(collapseEditor, 350),
+        setTimeout(collapseTopBar, 350 + 950),
+        setTimeout(() => {
+          centerOutput(output);
+          zoomDone = true;
+        }, 350 + 950 + 750 + 700),
+      ];
+    }
+
+    // Lets ESC fast-forward an in-progress zoom-out (i.e. the run finished
+    // naturally and the multi-stage animation is still playing) straight to
+    // the finished, centered state.
+    function skipZoomIfPending() {
+      if (!completed || zoomDone) return false;
+      pendingZoomTimeouts.forEach(clearTimeout);
+      pendingZoomTimeouts = [];
+      applyInstantFinal(finalOutput);
+      return true;
+    }
+
+    function runStep(interpreterInstance) {
+      if (animationSkipped) {
+        skipToFinal();
+        return;
+      }
+      const ok = interpreterInstance._step();
+      stepCount += 1;
+      interpreterInstance.steps = stepCount;
+      renderTextOutput(interpreterInstance.output);
+      setStage(`RUNNING 25/s · STEPS: ${stepCount}`, 'running');
+      if (!ok) {
+        clearInterval(animator);
+        finalizeRun(interpreterInstance.output);
+      }
+    }
+
+    function startRun() {
+      stepCount = 0;
+      runButton.classList.add('active');
+      interpreter = new window.BefungeLogicInterpreter(program);
+      setStage('RUNNING 25/s · STEPS: 0', 'running');
+      animator = setInterval(() => runStep(interpreter), 40);
+      setTimeout(() => runButton.classList.remove('active'), 300);
+    }
+
+    function skipToFinal() {
+      if (completed) {
+        skipZoomIfPending();
+        return;
+      }
+      clearInterval(typingTimer);
+      clearInterval(animator);
+      aceEditor.setReadOnly(false);
+      aceEditor.setValue(program, -1);
+      aceEditor.setReadOnly(true);
+      interpreter = new window.BefungeLogicInterpreter(program);
+      interpreter.run();
+      finalizeRun(interpreter.output, true);
+    }
+
+    function handleInteraction() {
+      if (completed) return;
+      runHint.classList.add('active');
+      runHint.textContent = 'Press ESC to skip animation';
+    }
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        animationSkipped = true;
+        skipToFinal();
+      } else {
+        handleInteraction();
+      }
+    });
+
+    document.addEventListener('mousedown', () => {
+      handleInteraction();
+    });
+
+    setStage('TYPE TO RUN…', 'typing');
+    typingTimer = setInterval(() => {
+      if (animationSkipped || typedIndex >= program.length) {
+        clearInterval(typingTimer);
+        if (!completed) startRun();
+        return;
+      }
+      typedIndex += 1;
+      aceEditor.setReadOnly(false);
+      aceEditor.setValue(program.slice(0, typedIndex), -1);
+      aceEditor.setReadOnly(true);
+      setStage('TYPING…', 'typing');
+      if (typedIndex >= program.length) {
+        clearInterval(typingTimer);
+        setTimeout(startRun, 220);
+      }
+    }, 120);
+  </script>
 </body>
-
-
-
 </html>
