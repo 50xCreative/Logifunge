@@ -192,6 +192,37 @@ class BefungeLogicInterpreter {
     return null;
   }
 
+  // Scans from (x,y) stepping by (dx,dy) — exactly one of which is nonzero,
+  // matching the engine's four cardinal directions — collecting characters
+  // until `terminator` (the bracket char being searched for) is found.
+  // The value is built from digits in the order actually traversed, so
+  // direction and entry point both affect the result, by design.
+  _scanNumberInDirection(x, y, dx, dy, terminator) {
+    let val = '';
+    let tx = x + dx, ty = y + dy;
+    let steps = 0;
+    while (steps < 20) {
+      const c = this._getCell(tx, ty);
+      if (c === terminator) return { val: parseInt(val, 10), endX: tx, endY: ty };
+      if (c === ' ') return null;
+      val += c;
+      tx += dx; ty += dy;
+      steps++;
+    }
+    return null;
+  }
+
+  // Wraps this.ip in place using the same rule _advance() uses: y wraps
+  // across the number of rows, x wraps within the current row's width.
+  _wrapPosition() {
+    const rows = this.grid.length || 1;
+    if (this.ip.y < 0) this.ip.y = rows - 1;
+    if (this.ip.y >= rows) this.ip.y = 0;
+    const rowLen = (this.grid[this.ip.y] || []).length || 1;
+    if (this.ip.x < 0) this.ip.x = rowLen - 1;
+    if (this.ip.x >= rowLen) this.ip.x = 0;
+  }
+
   _parseGrid(code) {
     const lines = code.split('\n');
     return lines.map(l => l.split(''));
@@ -368,15 +399,26 @@ class BefungeLogicInterpreter {
       }
     }
 
-    // [n] number literal
-    if (cell === '[') {
-      const tok = this._scanToken(x, y);
-      if (tok && tok.kind === 'num') {
-        if (!isNaN(tok.val)) this._push(tok.val);
-        const after = this._nextPosition(x, y, tok.endX);
-        this.ip.x = after.x;
-        this.ip.y = after.y;
-        return true;
+    // [n] number literal — works along whichever axis the IP is actually
+    // traveling (horizontal or vertical), and from either end. Whichever
+    // bracket char you land on, the rest of the literal necessarily lies
+    // further along your current direction of travel (you just walked
+    // into one end of it from outside), so we always scan *forward* in
+    // this.dir looking for the other bracket, and read the value from the
+    // digits in the order actually traversed. That means e.g. a leftward
+    // pass over [12] yields 21, not 12 — it reflects what was scanned.
+    if (cell === '[' || cell === ']') {
+      const dx = this.dir.x, dy = this.dir.y;
+      if (dx !== 0 || dy !== 0) {
+        const terminator = cell === '[' ? ']' : '[';
+        const found = this._scanNumberInDirection(x, y, dx, dy, terminator);
+        if (found && !isNaN(found.val)) {
+          this._push(found.val);
+          this.ip.x = found.endX + dx;
+          this.ip.y = found.endY + dy;
+          this._wrapPosition();
+          return true;
+        }
       }
     }
 
@@ -606,14 +648,7 @@ class BefungeLogicInterpreter {
   _advance() {
     this.ip.x += this.dir.x;
     this.ip.y += this.dir.y;
-    // Wrap Y around the number of rows
-    const rows = this.grid.length || 1;
-    if (this.ip.y < 0) this.ip.y = rows - 1;
-    if (this.ip.y >= rows) this.ip.y = 0;
-    // Wrap X within the current row's actual width (per-row, not global max)
-    const rowLen = (this.grid[this.ip.y] || []).length || 1;
-    if (this.ip.x < 0) this.ip.x = rowLen - 1;
-    if (this.ip.x >= rowLen) this.ip.x = 0;
+    this._wrapPosition();
   }
 
   run() {
@@ -638,6 +673,8 @@ class BefungeLogicInterpreter {
       steps: this.steps,
       error: this.error,
       stack: [...this.stack],
+      memory: { ...this.memory },
+      memoryPointer: this.memoryPointer,
     };
   }
 }
