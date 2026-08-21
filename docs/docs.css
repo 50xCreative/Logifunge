@@ -1,0 +1,120 @@
+/* --- Positioning & Layout --- */
+
+/* Reset for a clean slate */
+* { box-sizing: border-box; }
+
+body {
+    font-family: system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    color: #222;
+    margin: 0;
+    padding: 0;
+    
+    /* This creates the two-column layout seen in your screenshot */
+    display: grid;
+    grid-template-columns: 350px 1fr; /* Left side is 350px, right takes rest */
+    min-height: 100vh;
+}
+
+/* The left side (Header/Sidebar) */
+header, .sidebar {
+    padding: 2rem;
+    border-right: 1px solid #ddd;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    background: #fff;
+}
+
+/* The right side (Main Content) */
+main {
+    padding: 2rem 4rem;
+    max-width: 1000px; /* Limits width for better readability */
+}
+
+/* --- Typography (UX Focus) --- */
+
+h1 { margin-top: 0; font-size: 2rem; text-transform: uppercase; }
+h2 { 
+    font-size: 1.75rem; 
+    border-bottom: 2px solid #222; 
+    padding-bottom: 0.5rem; 
+    margin-top: 3rem; 
+}
+
+/* Logic for the horizontal rules/spacing */
+hr { border: 0; border-top: 1px solid #ddd; margin: 2rem 0; }
+
+/* --- Code & Commands --- */
+
+pre {
+    background-color: #f4f4f4;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: monospace;
+    border: 1px solid #ddd;
+    margin: 1.5rem 0;
+}
+
+.command {
+    font-family: monospace;
+    background-color: #eee;
+    padding: 0.1rem 0.3rem;
+    font-weight: bold;
+}
+
+/* --- Tables --- */
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+}
+
+th, td {
+    text-align: left;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+}
+
+th { background-color: #f9f9f9; }
+
+/* --- Inputs & Version Selector --- */
+
+select {
+    padding: 0.3rem;
+    font-size: 1rem;
+    border: 1px solid #bbb;
+    background: #fff;
+}
+
+/* --- Top Right Label --- */
+body::before {
+    content: "DOCUMENTATION MODE: " attr(data-version);
+    position: fixed;
+    top: 0;
+    right: 0;
+    padding: 0.5rem 1rem;
+    background: #eee;
+    font-size: 0.7rem;
+    font-weight: bold;
+    border-left: 1px solid #ddd;
+    border-bottom: 1px solid #ddd;
+    z-index: 100;
+}
+
+/* --- Responsive (Stacking on Mobile) --- */
+@media (max-width: 900px) {
+    body {
+        display: block; /* Stack columns on top of each other */
+    }
+    header, .sidebar {
+        height: auto;
+        position: relative;
+        border-right: none;
+        border-bottom: 1px solid #ddd;
+    }
+    main {
+        padding: 2rem;
+    }
+}

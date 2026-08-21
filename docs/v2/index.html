@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE v2 Documentation</title></head>
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE v2 Documentation</title><link rel="stylesheet" href="../docs.css"></head>
 <body data-version="v2">
 <main>
   <section><h2>The Basics of Logifunge v2</h2><p>Logifunge v2 runs a character grid with a moving instruction pointer. It starts at the upper-left, travels right, and wraps at the edges. A space is a blank instruction, not a stop. Direction commands let a program cross its own path and form loops.</p><p>Execution is deliberately small: one cell is read, one instruction is performed, and the pointer advances. Use the IDE's STEP control when learning a program; the stack and output change one instruction at a time.</p><h3>A first program</h3><pre>[65] = %</pre><p>The literal pushes 65, <span class="command">=</span> prints its ASCII character, and <span class="command">%</span> ends execution.</p></section>

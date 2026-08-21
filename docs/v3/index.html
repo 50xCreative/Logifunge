@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE v3 Documentation</title></head>
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE v3 Documentation</title><link rel="stylesheet" href="../docs.css"></head>
 <body data-version="v3">
 <main>
   <section><h2>The Basics of Logifunge v3</h2><p>Logifunge v3 treats source code as a grid. The instruction pointer starts at (0,0), moves right, and wraps around the edges. Direction changes turn a line of code into a path: programs can go around corners, travel vertically, and cross their own instructions.</p><p>Each cell is visited one at a time. Digits, literals, and strings put values on the stack; operators consume values; and the pointer advances after the instruction. A space does nothing. Execution ends at <span class="command">%</span> or when the IDE's step limit is reached.</p><h3>A first program</h3><pre>[65] = %</pre><p>This pushes 65, prints the ASCII character A, and terminates.</p></section>

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE v4 Documentation</title></head>
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE v4 Documentation</title><link rel="stylesheet" href="../docs.css"></head>
 <body data-version="v4">
 <main>
   <section><h2>The Basics of Logifunge v4</h2><p>A Logifunge v4 program is a grid of instructions. The instruction pointer begins at the upper-left and travels right, wrapping across the grid's edges. Direction commands can turn the pointer, so the order of execution is determined by the path rather than by the visual order of the source alone.</p><p>Each instruction executes once when visited. Spaces do nothing. The stack stores values between instructions, and <span class="command">%</span> ends the program. The IDE can run the complete path or reveal it one step at a time.</p><h3>A first program</h3><pre>[65] = %</pre><p>Push 65, print A, then stop.</p></section>
