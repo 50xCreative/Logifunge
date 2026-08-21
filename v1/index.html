@@ -244,7 +244,7 @@
   <div id="spacer"></div>
   <span id="status">READY</span>
   <div class="sep"></div>
-  <button id="btn-help">?</button>
+  <button id="btn-help" onclick="window.open('../docs/v1/', '_blank', 'noopener')">DOCS</button>
 </div>
 
 <!-- BODY -->
@@ -277,8 +277,8 @@
   </div>
 </div>
 
-<!-- HELP / REFERENCE MODAL -->
-<div id="help-modal">
+<!-- Legacy help markup retained only as an inert compatibility comment. -->
+<!-- <div id="help-modal">
   <div id="help-box">
     <h2>
       LOGIFUNGE REFERENCE
@@ -355,7 +355,7 @@
 
     <div class="help-hint">Press <strong style="color:#fa0">?</strong> or <strong style="color:#fa0">/</strong> to toggle · <strong style="color:#fa0">Esc</strong> to close · <strong style="color:#fa0">Ctrl+Enter</strong> to run</div>
   </div>
-</div>
+</div> -->
 
 <script src="examples.js"></script>
 <script src="interpreter.js"></script>
@@ -395,12 +395,8 @@ const inpH        = document.getElementById('inp-h');
 const btnRun      = document.getElementById('btn-run');
 const btnStep     = document.getElementById('btn-step');
 const btnClear    = document.getElementById('btn-clear');
-const btnHelp     = document.getElementById('btn-help');
 const modeBtnText = document.getElementById('mode-text');
 const modeBtnPixel= document.getElementById('mode-pixel');
-const helpModal   = document.getElementById('help-modal');
-const helpClose   = document.getElementById('help-close');
-const exampleList = document.getElementById('example-list');
 const ctx         = canvas.getContext('2d');
 const gCtx        = gridCanvas.getContext('2d');
 
@@ -531,40 +527,8 @@ function clearOutput() {
   }
 }
 
-// ── HELP MODAL ────────────────────────────────────────────────
-function buildExamples() {
-  exampleList.innerHTML = '';
-  bundledExamples.forEach(ex => {
-    const card = document.createElement('div');
-    card.className = 'example-card';
-    card.innerHTML = `
-      <div class="example-name">${ex.name} <span style="color:#444;font-size:9px">[${ex.mode.toUpperCase()}]</span></div>
-      <div class="example-desc">${ex.desc}</div>
-      <div class="example-code">${ex.code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-    `;
-    card.addEventListener('click', () => {
-      aceEditor.setValue(ex.code, -1);
-      setMode(ex.mode);
-      closeHelp();
-      setStatus('EXAMPLE LOADED');
-    });
-    exampleList.appendChild(card);
-  });
-}
-
-function openHelp()  { buildExamples(); helpModal.classList.add('open'); }
-function closeHelp() { helpModal.classList.remove('open'); }
-
-btnHelp.addEventListener('click', openHelp);
-helpClose.addEventListener('click', closeHelp);
-helpModal.addEventListener('click', e => { if (e.target === helpModal) closeHelp(); });
-
 // ── KEYBOARD ──────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if ((e.key === '?' || e.key === '/') && !e.ctrlKey && !e.metaKey && document.activeElement !== aceEditor.textInput.getElement()) {
-    e.preventDefault(); helpModal.classList.contains('open') ? closeHelp() : openHelp(); return;
-  }
-  if (e.key === 'Escape') { closeHelp(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); }
 });
 

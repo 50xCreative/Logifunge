@@ -3,35 +3,35 @@ const examples = [
     name: 'AND Gate Truth Table',
     mode: 'text',
     desc: 'All four input combos through AND',
-    code: '0 0 & . 0 1 & . 1 0 & . 1 1 & . %',
+    code: '00&.01&.10&.11&.%',
     expectedOutput: { text: '0 0 0 1' }
   },
   {
     name: 'XOR Gate',
     mode: 'text',
     desc: 'XOR truth table',
-    code: '0 0 @ . 0 1 @ . 1 0 @ . 1 1 @ . %',
+    code: '00@.01@.10@.11@.%',
     expectedOutput: { text: '0 1 1 0' }
   },
   {
     name: 'Half Adder',
     mode: 'text',
     desc: 'Sum (XOR) and carry (AND) for 1+1',
-    code: '1 1 : : @ . \\ & . %',
+    code: '11::@.\\&.%',
     expectedOutput: { text: '0 1' }
   },
   {
     name: 'NOT Loop',
     mode: 'text',
     desc: 'Repeated NOT on 0 produces four ones',
-    code: '0 ~ 1 & . ~ 1 & . ~ 1 & . ~ 1 & . %',
+    code: '0~1&.~1&.~1&.~1&.%',
     expectedOutput: { text: '1 1 1 1' }
   },
   {
     name: 'NAND Universality',
     mode: 'text',
     desc: 'AND built from NAND: NAND(NAND(a,b), NAND(a,b)). Push a and b, NAND them, duplicate the result, NAND again.',
-    code: '1 1 N : N . %',
+    code: '11N:N.%',
     expectedOutput: { text: '1' }
   },
   {
@@ -59,7 +59,7 @@ const examples = [
     name: 'Pixel Push/Pull Demo',
     mode: 'pixel',
     desc: "Write pixels with , then read them back with '",
-    code: "0 0 1 , 1 1 1 , 0 0 ' . 1 1 ' . %",
+    code: "001,111,00'.11'.%",
     expectedOutput: {
       pixels: [
         { x: 0, y: 0, on: true, value: 1 },
@@ -71,14 +71,14 @@ const examples = [
     name: 'Pack/Unpack Stack Values',
     mode: 'text',
     desc: 'Pack five bits into one self-describing value, then unpack it back with no count needed',
-    code: '0 0 0 0 1 5 ( ) . . . . . %',
+    code: '000015().....%',
     expectedOutput: { text: '1 0 0 0 0' }
   },
   {
     name: 'Memory Pointer Demo',
     mode: 'text',
     desc: 'Store and load through a memory pointer using M/S/L',
-    code: '5 M 7 S L . %',
+    code: '5M7SL.%',
     expectedOutput: { text: '7' }
   }
 ];

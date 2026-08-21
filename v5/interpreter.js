@@ -79,6 +79,14 @@
  *   }[name]  Pop value; if nonzero jump back to {[name], else continue.
  *
  * Label names can contain any characters except ] (e.g. D[count neighbours])
+ *
+ * D[name], C[name], {[name] and }[name] may each be written either
+ * horizontally (the marker char immediately followed by [ to its right,
+ * e.g. D[name]) or vertically (the marker char immediately followed by [
+ * directly below it, with the name and closing ] continuing downward,
+ * one character per row). Whichever orientation is used, the token is
+ * parsed as a whole and the IP resumes immediately after the closing ]
+ * in that same direction.
  */
 
 /**
@@ -119,6 +127,7 @@ class BefungeLogicInterpreter {
 
 
   constructor(code, pixelWidth = 64, pixelHeight = 64, maxSteps = 1000000) {
+    this.sourceCode = code;
     this.grid = this._parseGrid(code);
     this.ip = { x: 0, y: 0 };
     this.dir = { x: 1, y: 0 }; // start going right
@@ -143,30 +152,48 @@ class BefungeLogicInterpreter {
     this._scanLabels();
   }
 
-  // Scan the entire grid once for D[name] and {[name] markers
+  // Scan the entire grid once for D[name] and {[name] markers. Each marker
+  // may be written horizontally (D immediately followed by [ to its right)
+  // or vertically (D immediately followed by [ directly below it, with the
+  // name and closing ] continuing in that same direction) — see _labelDir.
   _scanLabels() {
     for (let y = 0; y < this.grid.length; y++) {
       const row = this.grid[y];
       for (let x = 0; x < row.length; x++) {
         const ch = row[x];
-        if ((ch === 'D' || ch === '{') && row[x + 1] === '[') {
-          const kind = ch;
-          let name = '';
-          let tx = x + 2;
-          while (tx < row.length && row[tx] !== ']') {
-            name += row[tx++];
-          }
-          if (row[tx] === ']') {
-            const after = this._nextPosition(x, y, tx);
-            if (kind === 'D') {
-              this.labels[name] = { x: after.x, y: after.y };
-            } else {
-              this.loops[name] = { x: after.x, y: after.y };
-            }
+        if (ch !== 'D' && ch !== '{') continue;
+        const dir = this._labelDir(x, y);
+        if (!dir) continue;
+        let name = '';
+        let tx = x + 2 * dir.dx, ty = y + 2 * dir.dy;
+        let c = this._getCell(tx, ty);
+        while (c !== ']' && name.length < 64) {
+          name += c;
+          tx += dir.dx; ty += dir.dy;
+          c = this._getCell(tx, ty);
+        }
+        if (c === ']') {
+          const after = this._nextPosition(x, y, tx, ty, dir.dx, dir.dy);
+          if (ch === 'D') {
+            this.labels[name] = after;
+          } else {
+            this.loops[name] = after;
           }
         }
       }
     }
+  }
+
+  // Returns the direction {dx, dy} in which the [ opening bracket for a
+  // D/C/{/} marker at (x,y) is found — either immediately to the right
+  // ({dx:1, dy:0}) or immediately below ({dx:0, dy:1}) — or null if the
+  // cell isn't a marker char or has no adjacent [ in either direction.
+  _labelDir(x, y) {
+    const ch = this._getCell(x, y);
+    if (ch !== 'D' && ch !== 'C' && ch !== '{' && ch !== '}') return null;
+    if (this._getCell(x + 1, y) === '[') return { dx: 1, dy: 0 };
+    if (this._getCell(x, y + 1) === '[') return { dx: 0, dy: 1 };
+    return null;
   }
 
   // Given a position, scan forward (right then down) to find a token like :[name], {[name], ;[name], }[name], [n]
@@ -181,14 +208,57 @@ class BefungeLogicInterpreter {
       while (c !== ']' && c !== ' ' && val.length < 20) { val += c; tx++; c = this._getCell(tx, y); }
       if (c === ']') return { kind: 'num', val: parseInt(val, 10), endX: tx, endY: y };
     }
-    if (this._isLabelToken(x, y)) {
+    const dir = this._labelDir(x, y);
+    if (dir) {
       let name = '';
-      let tx = x + 2;
-      let c = this._getCell(tx, y);
-      while (c !== ']' && name.length < 64) { name += c; tx++; c = this._getCell(tx, y); }
-      if (c === ']') return { kind: ch, name, endX: tx, endY: y };
+      let tx = x + 2 * dir.dx, ty = y + 2 * dir.dy;
+      let c = this._getCell(tx, ty);
+      while (c !== ']' && name.length < 64) { name += c; tx += dir.dx; ty += dir.dy; c = this._getCell(tx, ty); }
+      if (c === ']') return { kind: ch, name, endX: tx, endY: ty, dx: dir.dx, dy: dir.dy };
     }
     return null;
+  }
+
+  // Scans from (x,y) stepping by (dx,dy) — exactly one of which is nonzero,
+  // matching the engine's four cardinal directions — collecting characters
+  // until `terminator` (the bracket char being searched for) is found.
+  // The value is built from digits in the order actually traversed, so
+  // direction and entry point both affect the result, by design.
+  _scanNumberInDirection(x, y, dx, dy, terminator) {
+    let val = '';
+    let tx = x + dx, ty = y + dy;
+    let steps = 0;
+    while (steps < 20) {
+      const c = this._getCell(tx, ty);
+      if (c === terminator) return { val: parseInt(val, 10), endX: tx, endY: ty };
+      if (c === ' ') return null;
+      val += c;
+      tx += dx; ty += dy;
+      steps++;
+    }
+    return null;
+  }
+
+  // Wraps an arbitrary {x, y} position using the same rule _advance() uses:
+  // y wraps across the number of rows, x wraps within that row's width.
+  // Returns a new object; does not mutate the input.
+  _wrapXY(pos) {
+    const rows = this.grid.length || 1;
+    let y = pos.y;
+    if (y < 0) y = rows - 1;
+    if (y >= rows) y = 0;
+    const rowLen = (this.grid[y] || []).length || 1;
+    let x = pos.x;
+    if (x < 0) x = rowLen - 1;
+    if (x >= rowLen) x = 0;
+    return { x, y };
+  }
+
+  // Wraps this.ip in place.
+  _wrapPosition() {
+    const wrapped = this._wrapXY(this.ip);
+    this.ip.x = wrapped.x;
+    this.ip.y = wrapped.y;
   }
 
   _parseGrid(code) {
@@ -197,8 +267,7 @@ class BefungeLogicInterpreter {
   }
 
   _isLabelToken(x, y) {
-    const ch = this._getCell(x, y);
-    return (ch === 'D' || ch === 'C' || ch === '{' || ch === '}') && this._getCell(x + 1, y) === '[';
+    return this._labelDir(x, y) !== null;
   }
 
   _getCell(x, y) {
@@ -214,10 +283,18 @@ class BefungeLogicInterpreter {
     row[x] = v;
   }
 
-  _nextPosition(x, y, endX) {
-    const row = this.grid[y];
-    if (row && endX + 1 < row.length) return { x: endX + 1, y };
-    return { x: 0, y: y + 1 };
+  // Position immediately after a token that ran from (x,y) to (endX,endY)
+  // in direction (dx,dy). For horizontal tokens (dy===0, the default) this
+  // keeps the original behavior: stay on the same row if possible, else
+  // wrap to the start of the next one. For vertical tokens, simply continue
+  // one more step in that direction (wrapped).
+  _nextPosition(x, y, endX, endY = y, dx = 1, dy = 0) {
+    if (dy === 0) {
+      const row = this.grid[y];
+      if (row && endX + dx < row.length && endX + dx >= 0) return { x: endX + dx, y };
+      return { x: 0, y: y + 1 };
+    }
+    return this._wrapXY({ x: endX, y: endY + dy });
   }
 
   _push(v) { this.stack.push(v); }
@@ -259,45 +336,36 @@ class BefungeLogicInterpreter {
   _skipSubroutine(x, y) {
     let cx = x, cy = y;
     const rows = this.grid.length;
-    let depth = 0; // each nested :[...] increments depth; matching r decrements
+    let depth = 0; // each nested D[...] increments depth; matching r decrements
     while (cy < rows) {
       const row = this.grid[cy] || [];
-      while (cx < row.length) {
-        const ch = row[cx];
-        // Detect D[name] — nested subroutine definition, push depth
-        if (ch === 'D' && row[cx + 1] === '[') {
-          depth++;
-          let tx = cx + 2;
-          while (tx < row.length && row[tx] !== ']') tx++;
-          cx = tx + 1;
+      if (cx >= row.length) { cy++; cx = 0; continue; }
+      const ch = row[cx];
+
+      // Detect D[name] / C[name] / {[name] / }[name] / [n] tokens — these
+      // may be written horizontally or vertically, so delegate to the same
+      // _scanToken logic the main step loop uses, and jump straight past
+      // whichever orientation was actually used.
+      if (ch === 'D' || ch === 'C' || ch === '{' || ch === '}' || ch === '[') {
+        const tok = this._scanToken(cx, cy);
+        if (tok) {
+          if (tok.kind === 'D') depth++; // nested subroutine definition
+          const dx = tok.dx ?? 1, dy = tok.dy ?? 0;
+          const after = this._nextPosition(cx, cy, tok.endX, tok.endY, dx, dy);
+          cx = after.x; cy = after.y;
           continue;
         }
-        // Skip over other label-style tokens (C[...], {[...], }[...]) without changing depth
-        if ((ch === 'C' || ch === '{' || ch === '}') && row[cx + 1] === '[') {
-          let tx = cx + 2;
-          while (tx < row.length && row[tx] !== ']') tx++;
-          cx = tx + 1;
-          continue;
-        }
-        // Skip over [n] number literals
-        if (ch === '[') {
-          let tx = cx + 1;
-          while (tx < row.length && row[tx] !== ']') tx++;
-          cx = tx + 1;
-          continue;
-        }
-        if (ch === 'r') {
-          if (depth === 0) {
-            // Found the matching return for the outermost subroutine — resume after it
-            return { x: cx + 1, y: cy };
-          }
-          // 'r' closes a nested subroutine definition
-          depth--;
-        }
-        cx++;
       }
-      cy++;
-      cx = 0;
+
+      if (ch === 'r') {
+        if (depth === 0) {
+          // Found the matching return for the outermost subroutine — resume after it
+          return { x: cx + 1, y: cy };
+        }
+        // 'r' closes a nested subroutine definition
+        depth--;
+      }
+      cx++;
     }
     return null; // no matching r found
   }
@@ -320,7 +388,7 @@ class BefungeLogicInterpreter {
     if (this._isLabelToken(x, y)) {
       const tok = this._scanToken(x, y);
       if (tok) {
-        const after = this._nextPosition(x, y, tok.endX);
+        const after = this._nextPosition(x, y, tok.endX, tok.endY, tok.dx, tok.dy);
 
         if (tok.kind === 'D') {
           // Subroutine definition — skip body
@@ -367,15 +435,26 @@ class BefungeLogicInterpreter {
       }
     }
 
-    // [n] number literal
-    if (cell === '[') {
-      const tok = this._scanToken(x, y);
-      if (tok && tok.kind === 'num') {
-        if (!isNaN(tok.val)) this._push(tok.val);
-        const after = this._nextPosition(x, y, tok.endX);
-        this.ip.x = after.x;
-        this.ip.y = after.y;
-        return true;
+    // [n] number literal — works along whichever axis the IP is actually
+    // traveling (horizontal or vertical), and from either end. Whichever
+    // bracket char you land on, the rest of the literal necessarily lies
+    // further along your current direction of travel (you just walked
+    // into one end of it from outside), so we always scan *forward* in
+    // this.dir looking for the other bracket, and read the value from the
+    // digits in the order actually traversed. That means e.g. a leftward
+    // pass over [12] yields 21, not 12 — it reflects what was scanned.
+    if (cell === '[' || cell === ']') {
+      const dx = this.dir.x, dy = this.dir.y;
+      if (dx !== 0 || dy !== 0) {
+        const terminator = cell === '[' ? ']' : '[';
+        const found = this._scanNumberInDirection(x, y, dx, dy, terminator);
+        if (found && !isNaN(found.val)) {
+          this._push(found.val);
+          this.ip.x = found.endX + dx;
+          this.ip.y = found.endY + dy;
+          this._wrapPosition();
+          return true;
+        }
       }
     }
 
@@ -605,14 +684,7 @@ class BefungeLogicInterpreter {
   _advance() {
     this.ip.x += this.dir.x;
     this.ip.y += this.dir.y;
-    // Wrap Y around the number of rows
-    const rows = this.grid.length || 1;
-    if (this.ip.y < 0) this.ip.y = rows - 1;
-    if (this.ip.y >= rows) this.ip.y = 0;
-    // Wrap X within the current row's actual width (per-row, not global max)
-    const rowLen = (this.grid[this.ip.y] || []).length || 1;
-    if (this.ip.x < 0) this.ip.x = rowLen - 1;
-    if (this.ip.x >= rowLen) this.ip.x = 0;
+    this._wrapPosition();
   }
 
   run() {
@@ -637,6 +709,8 @@ class BefungeLogicInterpreter {
       steps: this.steps,
       error: this.error,
       stack: [...this.stack],
+      memory: { ...this.memory },
+      memoryPointer: this.memoryPointer,
     };
   }
 }
