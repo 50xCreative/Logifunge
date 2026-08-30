@@ -48,6 +48,8 @@
  *   -   Subtract
  *   *   Multiply
  *   /   Divide (integer)
+ *   l   Push the stack's current length (measured before this push)
+ *   U   Reverse the entire stack in place
  *
  * === MEMORY ===
  *   M   Set the active memory pointer to the popped index
@@ -674,6 +676,9 @@ class BefungeLogicInterpreter {
       case 'p': { const py = this._pop(), px = this._pop(), v = this._pop(); this._setCell(px, py, String.fromCharCode(v)); break; }
 
       case ' ': break;
+
+      case 'l': {this._push(this.stack.length); break}
+      case 'U': {this.stack.reverse(); break}
       default: break;
     }
 
