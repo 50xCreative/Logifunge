@@ -71,6 +71,14 @@ output: Hi!</pre>
     <pre>001, 111, %
 writes pixels (0,0) and (1,1)</pre>
     <p>Grid access is separate from pixel output. <span class="command">g</span> pops y then x and pushes the character currently in grid cell (x,y). <span class="command">p</span> pops y, x, and value, then changes that cell. This is how Logifunge programs can inspect and modify their own code.</p>
+    <h3>Self-modifying code</h3>
+    <p>The tricky part of <span class="command">p</span> is timing: it can overwrite a cell the IP hasn't reached yet, so the instruction that eventually runs there isn't the one visible in the source. Laid out by position, this program does exactly that:</p>
+    <pre>position:   0    1    2    3    4    5    6    7    8
+character:  "    5    "    6    0    p    2    .    %</pre>
+    <p>Cells 0–2 use string mode to push the character code for <span class="command">5</span> (53). Cells 3–4 push 6 and 0 — the coordinates of the <span class="command">2</span> waiting at position 6. When the IP reaches <span class="command">p</span> at position 5, it pops those three values (y, then x, then the value) and overwrites position (6, 0) — the <span class="command">2</span> — with a <span class="command">5</span>.</p>
+    <p>By the time the IP steps forward onto position 6, that cell no longer holds the <span class="command">2</span> printed in the source; it holds the <span class="command">5</span> that <span class="command">p</span> just wrote. So the program prints 5, not 2:</p>
+    <pre>"5"60p2.%
+output: 5</pre>
   </section>
 
   <section>
