@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE v6 Documentation</title><link rel="stylesheet" href="../docs.css"></head>
+<body data-version="v6">
+<main>
+  <section>
+    <h2>The Basics of Logifunge</h2>
+    <p>Logifunge is a small, two-dimensional programming language in the tradition of Befunge. A program is a grid of characters rather than a line of statements. The instruction pointer, or <i>IP</i>, starts at the upper-left cell and initially travels from left to right.</p>
+    <p>Each step reads one cell, performs its instruction, and advances the IP in its current direction. The IP can travel right, left, up, or down, and it wraps when it reaches the edge of the grid. Spaces are empty cells: they do nothing, but the IP still travels through them.</p>
+    <p>The v6 IDE lets you run a program at different speeds, execute one step at a time, and view text output, pixel output, both together in dual view, or the data and memory stacks. An optional syntax-highlighting mode colors the editor by instruction category. Programs stop with <span class="command">%</span>, when an error occurs, or when the step limit is reached.</p>
+    <h3>A first program</h3>
+    <p>The program below pushes the number 65, prints it as an ASCII character, and stops.</p>
+    <pre>[65] = %
+output: A</pre>
+    <p>Numbers are written in brackets when they have more than one digit. Thus <span class="command">[65]</span> is the multi-bit number 65, while the characters <span class="command">6</span> and <span class="command">5</span> push two separate values.</p>
+  </section>
+
+  <section>
+    <h2>The Stack</h2>
+    <p>Logifunge uses one last-in, first-out (LIFO) stack. Putting a value on it is called <i>pushing</i>; taking the top value off is called <i>popping</i>. Most instructions treat an empty stack leniently: if there's nothing to pop, they receive 0 rather than causing an underflow. A few instructions instead require a specific number of values up front — indexed swaps and pixel writes among them — and report an error if the stack is too shallow, since quietly substituting 0 there would more likely hide a bug than help.</p>
+    <p>Arithmetic and gates use postfix notation, and two-value operators combine their operands in the order the values were <i>pushed</i>, not the order they're popped. The first value written ends up beneath the second, so <span class="command">23-</span> pushes 2 and then 3, and computes 2 minus 3, not 3 minus 2. In a longer program, it helps to write the stack after each instruction:</p>
+    <pre>23- . %
+stack:       []
+after 2:     [2]
+after 3:     [2, 3]
+after -:     [-1]
+after .:     []       output: -1</pre>
+    <p>Three commands rearrange the stack without doing arithmetic: <span class="command">:</span> duplicates the top value, <span class="command">\</span> swaps the top two values, and <span class="command">$</span> pops a value without using it.</p>
+    <h3>Inspecting and rearranging the stack</h3>
+    <p>Two further commands work on the stack as a whole rather than on individual values. <span class="command">l</span> pushes the stack's current length — the count is taken before this push, so an empty stack pushes 0, and a stack with three values on it pushes 3. This is useful for loops that should run once per remaining value, or for checking there's enough on the stack before an operation that needs it. <span class="command">U</span> reverses the entire stack in place, which is handy when values were pushed in one order but are needed in the opposite order.</p>
+    <pre>1 2 3 l . %
+output: 3</pre>
+    <p>Here three values are pushed, then <span class="command">l</span> reports the depth (3) at that point, and <span class="command">.</span> prints it.</p>
+    <pre>1 2 3 U . . . %
+output: 1 2 3</pre>
+    <p>Pushing 1, 2, and 3 leaves the stack as <span class="command">[1, 2, 3]</span> with 3 on top. <span class="command">U</span> reverses it to <span class="command">[3, 2, 1]</span>, so the three pops that follow print 1, then 2, then 3 — the original push order restored.</p>
+    <p><span class="command">W</span> swaps two stack positions by index: index 0 is the top value, index 1 is the value below it, and so on. It pops two indexes and reports an error if either is out of bounds.</p>
+    <h3>Building larger values</h3>
+    <p>Digits push values from 0 through 9. A bracketed literal pushes a larger integer directly:</p>
+    <pre>[123] . %</pre>
+    <p>Bracketed literals are convenient, but arithmetic is useful when a value is being calculated. The following computes 123 from small digits, just as the classic Befunge examples build larger numbers from 9s and 7s.</p>
+    <pre>99*76*+ . %</pre>
+    <p>A bracketed literal is read in whichever direction the IP is actually traveling, starting from whichever bracket it lands on first. Reading forward over <span class="command">[12]</span> pushes 12, as expected. But entering the same literal moving <i>left</i> — landing on the closing <span class="command">]</span> first — reads the digits in the order they're encountered, which is reversed: a leftward pass over <span class="command">[12]</span> pushes 21, not 12. This only matters for literals a program deliberately walks backward into; written and read normally, left to right, a literal behaves exactly as it looks.</p>
+  </section>
+
+  <section>
+    <h2>Movement and Decisions</h2>
+    <p>There are four direct movement instructions. A direction remains active until another direction instruction changes it.</p>
+    <table><tr><th>Command</th><th>Effect</th><th>Example</th></tr><tr><td><span class="command">&gt;</span></td><td>Travel right.</td><td><span class="command">&gt;123...</span></td></tr><tr><td><span class="command">&lt;</span></td><td>Travel left.</td><td><span class="command">&lt;</span> wraps to the row's other edge.</td></tr><tr><td><span class="command">^</span></td><td>Travel up.</td><td>Useful for vertical programs.</td></tr><tr><td><span class="command">v</span></td><td>Travel down.</td><td>Useful for vertical programs.</td></tr><tr><td><span class="command">?</span></td><td>Choose one of the four directions at random.</td><td>Use for deliberately unpredictable paths.</td></tr><tr><td><span class="command">#</span></td><td>Move past the next cell without executing it.</td><td><span class="command">123#...</span> prints 3 and 2.</td></tr></table>
+    <p>The horizontal conditional <span class="command">_</span> pops a value. It travels right when the value is 0 and left when it is nonzero. The vertical conditional <span class="command">!</span> travels down for 0 and up for a nonzero value.</p>
+    <h3>Named loops</h3>
+    <p>A conditional combined with a turn can make a loop by hand, but Logifunge also has a dedicated pair of loop markers. <span class="command">{[name]</span> marks the top of a named loop; it consumes nothing and just marks a position. <span class="command">}[name]</span> pops one value — nonzero jumps back to the matching <span class="command">{[name]</span>, and zero continues forward past it.</p>
+    <pre>&gt;5{[count]:.1-:}[count]$%
+output: 5 4 3 2 1</pre>
+    <p>Names may contain any characters except <span class="command">]</span>, and a marker and its <span class="command">[name]</span> may be written horizontally (the bracket immediately to the right) or vertically (the bracket directly below, with the name and closing bracket continuing downward).</p>
+    <h3>For loops</h3>
+    <p>Where a named loop requires the program to track and pop its own counter, a for loop tracks the count internally. <span class="command">([name]</span> pops a count N and runs the body N times; if N is zero or negative, the body is skipped entirely and execution resumes just past the matching <span class="command">)[name]</span>. <span class="command">)[name]</span> pops nothing — unlike <span class="command">}[name]</span> — the interpreter itself remembers how many iterations remain, and jumps back to <span class="command">([name]</span> until the count is exhausted.</p>
+    <p><span class="command">G</span> pushes the current for loop's iteration index: 0 on the first pass, N−1 on the last. Using <span class="command">G</span> outside an active for loop is an error. With nested for loops, <span class="command">G</span> refers to the innermost one.</p>
+    <pre>5([i]G.)[i]%
+output: 0 1 2 3 4</pre>
+    <p>Here the loop runs 5 times. Each pass pushes and prints its own index via <span class="command">G</span>, with nothing left to pop at the closing marker.</p>
+  </section>
+
+  <section>
+    <h2>Logic Gates</h2>
+    <p>Logifunge treats 0 as false and a nonzero value as true for logic operations. The gates return 0 or 1, making them useful for decisions and digital circuits.</p>
+    <table><tr><th>Command</th><th>Operation</th><th>Stack behavior</th></tr><tr><td><span class="command">&amp;</span></td><td>AND</td><td>pop a, pop b, push a AND b</td></tr><tr><td><span class="command">|</span></td><td>OR</td><td>pop a, pop b, push a OR b</td></tr><tr><td><span class="command">@</span></td><td>XOR</td><td>pop a, pop b, push a XOR b</td></tr><tr><td><span class="command">N</span></td><td>NAND</td><td>the inverse of AND</td></tr><tr><td><span class="command">R</span></td><td>NOR</td><td>the inverse of OR</td></tr><tr><td><span class="command">X</span></td><td>XNOR</td><td>the inverse of XOR</td></tr><tr><td><span class="command">~</span></td><td>NOT</td><td>pop a, push the one-bit inverse of a</td></tr></table>
+    <p>Here is the complete XOR truth table. Each pair is consumed by <span class="command">@</span>, then <span class="command">.</span> prints the result.</p>
+    <pre>00@.  01@.  10@.  11@. %
+output: 0 1 1 0</pre>
+    <p>A half adder demonstrates why duplication matters. Starting with two 1 bits, one copy is sent to XOR for the sum and another to AND for the carry.</p>
+    <pre>11::@.\&.%
+output: 0 1</pre>
+    <p>NAND alone is universal: any other gate can be built from it. AND, for instance, is NAND applied twice to the same pair.</p>
+    <pre>11N:N.%
+output: 1</pre>
+  </section>
+
+  <section>
+    <h2>Input, Output, and Pixels</h2>
+    <p>Text output is appended to the IDE's output pane. <span class="command">.</span> pops and prints a decimal number; <span class="command">=</span> pops and prints its ASCII character. String mode, entered with <span class="command">"</span>, pushes the character value of every cell until the next quote.</p>
+    <pre>[72]=[105]=[33]=%
+output: Hi!</pre>
+    <p>Pixels are values in the IDE's configurable grid. <span class="command">,</span> pops a value, y, and x and writes that value at (x,y). <span class="command">'</span> pops y and x and pushes the pixel currently stored there. Coordinates outside the visible grid are ignored for drawing.</p>
+    <pre>001, 111, %
+writes pixels (0,0) and (1,1)</pre>
+    <p>Grid access is separate from pixel output. <span class="command">g</span> pops y then x and pushes the character currently in grid cell (x,y). <span class="command">p</span> pops y, x, and value, then changes that cell. This is how Logifunge programs can inspect and modify their own code.</p>
+    <h3>Self-modifying code</h3>
+    <p>The tricky part of <span class="command">p</span> is timing: it can overwrite a cell the IP hasn't reached yet, so the instruction that eventually runs there isn't the one visible in the source. Laid out by position, this program does exactly that:</p>
+    <pre>position:   0    1    2    3    4    5    6    7    8
+character:  "    5    "    6    0    p    2    .    %</pre>
+    <p>Cells 0–2 use string mode to push the character code for <span class="command">5</span> (53). Cells 3–4 push 6 and 0 — the coordinates of the <span class="command">2</span> waiting at position 6. When the IP reaches <span class="command">p</span> at position 5, it pops those three values (y, then x, then the value) and overwrites position (6, 0) — the <span class="command">2</span> — with a <span class="command">5</span>.</p>
+    <p>By the time the IP steps forward onto position 6, that cell no longer holds the <span class="command">2</span> printed in the source; it holds the <span class="command">5</span> that <span class="command">p</span> just wrote. So the program prints 5, not 2:</p>
+    <pre>"5"60p2.%
+output: 5</pre>
+  </section>
+
+  <section>
+    <h2>Subroutines</h2>
+    <p>Named subroutines give a program reusable pieces without overloading the ordinary stack commands. Define one with <span class="command">D[name]</span>; its body ends at <span class="command">r</span>. Normal program flow skips over the definition, including nested definitions inside it. Call it with <span class="command">C[name]</span>; the return address is saved separately from the data stack.</p>
+    <pre>1 C[inc] . %D[inc]1+r
+output: 2</pre>
+    <p>The definition above is skipped while the main program runs. The call jumps to <span class="command">D[inc]</span>, pushes 1, adds it to the caller's value, and returns. Names may contain any characters except <span class="command">]</span>. Definitions, calls, and both loop markers can each be written horizontally or vertically — whichever orientation is used, the IP resumes immediately after the closing bracket in that same direction.</p>
+  </section>
+
+  <section>
+    <h2>Memory</h2>
+    <p>Memory is a sparse collection of numbered cells, independent of the data stack. <span class="command">M</span> pops an index and selects it as the active memory pointer. <span class="command">S</span> stores the top stack value there without removing it. <span class="command">L</span> loads the selected value onto the stack; an unset cell loads as 0.</p>
+    <pre>5M 7S L . %
+output: 7</pre>
+  </section>
+
+  <section>
+    <h2>Exponents</h2>
+    <p><span class="command">P</span> pops an exponent, pops a base, and pushes the base raised to that power, flooring the result if it isn't a whole number. <span class="command">Q</span> pops a root index, pops a value, and pushes the floor of the integer nth root. Taking an even-numbered root of a negative value is an error, since the result isn't real.</p>
+    <pre>2[10]P.[27]3Q.%
+output: 1024 3</pre>
+    <p>The example computes 2<sup>10</sup> with <span class="command">P</span>, then the cube root of 27 with <span class="command">Q</span>.</p>
+  </section>
+
+  <section>
+    <h2>Elbow Redirect</h2>
+    <p><span class="command">E</span> pops a value. A nonzero value leaves the current direction untouched — the IP keeps going straight. A zero turns the IP 90° clockwise: right becomes down, down becomes left, left becomes up, and up becomes right.</p>
+    <pre>90E
+  .
+  %
+output: 9</pre>
+    <p>The IP starts moving right, pushes 9 and then 0, and reaches <span class="command">E</span> heading right. Popping the 0 turns it to travel downward, where it lands on <span class="command">.</span> and prints the 9 left on the stack, then reaches <span class="command">%</span> below that.</p>
+  </section>
+
+  <section>
+    <h2>Using the v6 IDE</h2>
+    <p>The v6 IDE is an execution and inspection environment for Logifunge programs. The editor is on the left and the selected view is on the right. You can edit the source at any time, then run it again or step through it from the beginning.</p>
+    <h3>Execution controls</h3>
+    <table><tr><th>Control</th><th>What it does</th></tr><tr><td><span class="command">Run</span></td><td>Executes the current program. Press it again while a program is running to stop it.</td></tr><tr><td><span class="command">Step</span></td><td>Executes exactly one instruction and updates the instruction pointer, output, and stack.</td></tr><tr><td><span class="command">Clear Output</span></td><td>Clears the selected output and resets the displayed pixel canvas when applicable.</td></tr><tr><td><span class="command">Speed</span></td><td>Chooses the delay between instructions. <span class="command">Max</span> batches steps, while <span class="command">Turbo</span> runs the interpreter in a Web Worker.</td></tr><tr><td><span class="command">W / H</span></td><td>Sets the pixel canvas width and height, from 1 through 256.</td></tr><tr><td><span class="command">Max Steps</span></td><td>Limits execution so an accidental infinite loop cannot run forever.</td></tr><tr><td><span class="command">SYNTAX</span></td><td>Toggles syntax highlighting in the editor, coloring movement, gates, stack, and loop instructions by category.</td></tr></table>
+    <p>The status line reports states such as <span class="command">Ready</span>, <span class="command">Running</span>, <span class="command">Done</span>, and errors. During stepping, the direction indicator shows the current IP direction and the editor highlights the active cell.</p>
+    <h3>Output views</h3>
+    <p>Choose one of four views. <span class="command">Text</span> shows printed numbers and characters, <span class="command">Pixel</span> shows the pixel canvas, and <span class="command">Dual</span> shows both at once. <span class="command">Stacks</span> replaces the output with an inspector for the data stack and sparse memory.</p>
+    <h3>Inspecting large stacks</h3>
+    <p>The stack inspector is designed for programs that leave thousands or millions of values behind. The global <span class="command">Value</span> search filters values in both lists, while <span class="command">Index</span> searches indexes in both lists. The filters can be combined.</p>
+    <p>Each panel also has its own range field and ordering menu. Enter an inclusive range such as <span class="command">0:10</span>. Negative values clamp to 0, values beyond the available maximum clamp to the last index, and reversed ranges are normalized. For example, <span class="command">-99:5</span> becomes 0 through 5, and <span class="command">0:999999999999</span> ends at the collection's maximum index.</p>
+    <table><tr><th>Panel control</th><th>Meaning</th></tr><tr><td><span class="command">Default</span></td><td>Shows up to 2,500 entries from the highest indexes, followed by up to 2,500 entries from the lowest indexes.</td></tr><tr><td><span class="command">Lowest to Highest</span></td><td>Starts at the lowest matching index and displays at most 5,000 rows.</td></tr><tr><td><span class="command">Highest to Lowest</span></td><td>Starts at the highest matching index and displays at most 5,000 rows.</td></tr><tr><td>Range</td><td>Limits only that panel. The data-stack range does not affect memory, and the memory range does not affect the data stack.</td></tr></table>
+    <p>Only a bounded number of rows are rendered at once. This keeps the interface usable even when the underlying stack contains one million values. The inspector remains scrollable, and searches are briefly debounced while you type.</p>
+  </section>
+
+  <section>
+    <h2>Appendix: Command Summary</h2>
+    <table><tr><th>Command</th><th>Meaning</th></tr><tr><td><span class="command">0-9</span></td><td>Push a one-digit number.</td></tr><tr><td><span class="command">[n]</span></td><td>Push integer n.</td></tr><tr><td><span class="command">+ - * /</span></td><td>Pop two values and push the arithmetic result. Division is integer division.</td></tr><tr><td><span class="command">P Q</span></td><td>Power and integer nth root.</td></tr><tr><td><span class="command">&amp; | @ N R X ~</span></td><td>Boolean gates.</td></tr><tr><td><span class="command">: \\ $</span></td><td>Duplicate, swap, or discard stack values.</td></tr><tr><td><span class="command">l U W</span></td><td>Push the stack's length, reverse the entire stack, or swap two positions by index.</td></tr><tr><td><span class="command">&gt; &lt; ^ v ?</span></td><td>Set IP direction.</td></tr><tr><td><span class="command">_ ! E</span></td><td>Pop a condition and branch horizontally, vertically, or turn 90° clockwise.</td></tr><tr><td><span class="command">#</span></td><td>Skip the next cell.</td></tr><tr><td><span class="command">. =</span></td><td>Print a number or ASCII character.</td></tr><tr><td><span class="command">, '</span></td><td>Write or read a pixel.</td></tr><tr><td><span class="command">g p</span></td><td>Read or modify a program-grid cell.</td></tr><tr><td><span class="command">&quot;</span></td><td>Toggle string mode.</td></tr><tr><td><span class="command">M S L</span></td><td>Select, store, and load sparse memory.</td></tr><tr><td><span class="command">D[name] C[name] r</span></td><td>Define, call, and return from a subroutine.</td></tr><tr><td><span class="command">{[name] }[name]</span></td><td>Begin and repeat a named loop.</td></tr><tr><td><span class="command">([name] )[name] G</span></td><td>Begin, end, and read the index of a for loop.</td></tr><tr><td><span class="command">%</span></td><td>End the program.</td></tr></table>
+    <h3>Important differences from Befunge-93</h3>
+    <p>Logifunge borrows the two-dimensional instruction pointer and postfix stack model, but it is not a Befunge-93 implementation. In Logifunge, <span class="command">@</span> is XOR, not the end instruction; <span class="command">%</span> ends a program, not modulo; <span class="command">&amp; | ~ N R X</span> are logic gates; and subroutines use explicit <span class="command">D[name]</span> and <span class="command">C[name]</span> markers rather than overloading <span class="command">:</span>. Logifunge also adds pixels, sparse memory, and a browser-based step debugger.</p>
+    <h3>Changes since v5</h3>
+    <p>This is a breaking change from v5: <span class="command">(</span> and <span class="command">)</span> no longer pack and unpack bit-values. They are now the for-loop markers described above, and there is no packing operator in v6. Existing v5 programs that use <span class="command">(</span> or <span class="command">)</span> for packing will need to be rewritten.</p>
+    <p>New in v6: <span class="command">P</span> and <span class="command">Q</span> for exponents and integer roots, <span class="command">E</span> for elbow-turn redirects, and the <span class="command">([name] )[name] G</span> for-loop family alongside the existing named loops. The IDE also adds a <span class="command">SYNTAX</span> toggle for editor highlighting.</p>
+    <p><a href="../../v6/">Open the v6 IDE</a></p>
+  </section>
+</main><script src="../docs.js"></script>
+</body></html>

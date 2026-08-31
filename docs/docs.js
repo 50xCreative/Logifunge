@@ -1,6 +1,6 @@
 (function () {
   const pageVersion = document.body.dataset.version;
-  const versions = ['v1', 'v2', 'v3', 'v4', 'v5'];
+  const versions = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6'];
   const header = document.createElement('header');
   header.innerHTML = `
     <center>
