@@ -285,6 +285,7 @@ class BefungeLogicInterpreter {
   // Integer nth root, floored toward zero on the magnitude (e.g. root(10,3) = 2).
   // Starts from a floating-point estimate then nudges it to the exact
   // integer floor, since Math.pow(a, 1/n) can be off by one near perfect powers.
+  /*
   _integerNthRoot(a, n) {
     if (a === 0) return 0;
     if (a < 0) return -this._integerNthRoot(-a, n); // n is guaranteed odd here (caller checks)
@@ -293,6 +294,11 @@ class BefungeLogicInterpreter {
     while (Math.pow(guess + 1, n) <= a) guess++;
     while (guess > 0 && Math.pow(guess, n) > a) guess--;
     return guess;
+  }
+  */
+
+  _integerNthRoot(a, n) {
+    return Math.floor(math.nthRoot(a, n));
   }
 
   _push(v) { this.stack.push(v); }
