@@ -721,6 +721,16 @@ class BefungeLogicInterpreter {
         break;
       }
 
+      case 'A': {const v = this._pop(); this._push(Math.abs(v)); break}
+      case 'm': {
+        if (!this._requireStackDepth(2, "Requires mod(a, b)")) return false;
+        const b = this._pop();
+        const a = this._pop();
+        this._push(a % b);
+        break;
+      }
+      case 's': {const v = this._pop(); this._push(Math.sign(v)); break;}
+
       default: break;
     }
 
