@@ -6,7 +6,7 @@
  * Token categories:
  *   movement    > < ^ v ? #
  *   logic gate  & | ~ @ N R X
- *   stack/math  0-9 : \ $ W + - * / l U  and  [n] numeric literals
+ *   stack/math  0-9 : \ $ W + - * / l U A s m  and  [n] numeric literals
  *   memory      M S L
  *   output      . = , ' "  (and the string-mode contents of " ... ")
  *   control     _ ! g p %
@@ -102,7 +102,7 @@ var LogifungeHighlightRules = function() {
       { token: 'constant.numeric.logifunge', regex: /[0-9]/ },
 
       // ── Stack manipulation ──
-      { token: 'keyword.operator.stack.logifunge', regex: /[:\\$W+\-*\/lU]/ },
+      { token: 'keyword.operator.stack.logifunge', regex: /[:\\$W+\-*\/lUAsm]/ },
 
       // ── Whitespace (no-op cell) ──
       { token: 'text', regex: /\s+/ },
