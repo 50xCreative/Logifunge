@@ -9,13 +9,13 @@
   <meta name="keywords" content="logifunge, esoteric programming language, esolang, befunge, logic gates, boolean logic, online IDE, code playground" />
   <meta name="author" content="LOGIFUNGE" />
   <meta name="theme-color" content="#111111" />
-  <link rel="canonical" href="https://logifunge.pages.dev/v4/" />
+  <link rel="canonical" href="https://logifunge.pages.dev/__VERSION__/" />
 
   <!-- Open Graph / social embeds -->
   <meta property="og:type" content="website" />
   <meta property="og:title" content="LOGIFUNGE — an esoteric logic-gate programming language IDE" />
   <meta property="og:description" content="A browser-based esoteric language combining Befunge-style 2D movement with boolean logic gates. Write, step, and run code with live text or pixel output." />
-  <meta property="og:url" content="https://logifunge.pages.dev/v4/" />
+  <meta property="og:url" content="https://logifunge.pages.dev/__VERSION__/" />
   <meta property="og:site_name" content="LOGIFUNGE" />
   <meta property="og:image" content="https://logifunge.pages.dev/og-image.png" />
   <meta property="og:image:width" content="1200" />
@@ -47,10 +47,10 @@
   }
   </script>
 
-  <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="logifunge-ace-theme.css" />
+  <link rel="stylesheet" href="/v6/style.css" />
+  <link rel="stylesheet" href="/v6/logifunge-ace-theme.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.min.js"></script>
-  <script src="mode-logifunge.js"></script>
+  <script src="/v6/mode-logifunge.js"></script>
 </head>
 <body>
 
@@ -98,7 +98,7 @@
   <span id="status">Ready</span>
   <div class="sep"></div>
   <button id="btn-toggle-highlight">SYNTAX</button>
-  <button id="btn-help" onclick="window.open('../docs/v6/', '_blank', 'noopener')">DOCS</button>
+  <button id="btn-help" onclick="window.open('/docs/__VERSION__/', '_blank', 'noopener')">DOCS</button>
 </div>
 
 <!-- BODY -->
@@ -165,8 +165,8 @@
   </div>
 </div>
 
-<script src="examples.js"></script>
-<script src="interpreter.js"></script>
+<script src="/__VERSION__/examples.js"></script>
+<script src="/interpreter?v=__VERSION_NUM__"></script>
 <script>
 // ── ACE EDITOR SETUP ──────────────────────────────────────────
 const aceEditor = ace.edit('ace-editor');
@@ -440,7 +440,7 @@ let turboWorkerBusy = false;
 function getTurboWorker() {
   if (turboWorker) return turboWorker;
   const workerSrc = `
-    importScripts(${JSON.stringify(new URL('interpreter.js', location.href).href)});
+    importScripts(${JSON.stringify(new URL('/interpreter?v=__VERSION_NUM__', location.origin).href)});
     self.onmessage = function(e) {
       const { code, w, h, maxSteps } = e.data;
       const interp = new BefungeLogicInterpreter(code, w, h, maxSteps);
