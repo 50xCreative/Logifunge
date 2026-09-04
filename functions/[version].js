@@ -9,10 +9,12 @@
 // (/interpreter?v=N), examples.js, the docs link, and canonical URL.
 // This replaces six near-duplicate index.html files with one template.
 
+import { RUN_HTML_TEMPLATE } from './_run-template.js';
+
 const VERSION_PATTERN = /^v([1-6])$/i;
 
 export async function onRequestGet(context) {
-  const { params, env, request } = context;
+  const { params } = context;
   const segment = String(params.version || '');
   const match = segment.match(VERSION_PATTERN);
 
@@ -25,15 +27,8 @@ export async function onRequestGet(context) {
 
   const num = match[1];
   const versionSlug = `v${num}`;
-  const templateUrl = new URL('/run.html', request.url);
-  const templateResponse = await env.ASSETS.fetch(new Request(templateUrl.toString(), request));
 
-  if (!templateResponse.ok) {
-    return new Response('Template not found', { status: 500 });
-  }
-
-  let html = await templateResponse.text();
-  html = html
+  const html = RUN_HTML_TEMPLATE
     .replaceAll('__VERSION_NUM__', num)
     .replaceAll('__VERSION__', versionSlug);
 

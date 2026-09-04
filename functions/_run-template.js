@@ -1,4 +1,7 @@
-<!DOCTYPE html>
+// Auto-generated from run.html — keep in sync manually, or regenerate
+// with a build step if run.html changes. Embedding as a string avoids
+// relying on env.ASSETS.fetch() for the template itself.
+export const RUN_HTML_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -324,7 +327,7 @@ function setStatus(msg, cls) {
 
 function setDirectionLabel(dir) {
   const arrow = dir && dir.x === 1 ? '>' : dir && dir.x === -1 ? '<' : dir && dir.y === 1 ? 'v' : '^';
-  dirIndicator.textContent = `DIR ${arrow || '>'}`;
+  dirIndicator.textContent = \`DIR \${arrow || '>'}\`;
 }
 
 function clearActiveCellHighlight() {
@@ -357,9 +360,9 @@ function showStack(stack) {
     const previewLimit = 200;
     const preview = stack.slice(-previewLimit);
     const count = stack.length > previewLimit
-      ? `<span style="color:#666">${stack.length} values: </span>`
+      ? \`<span style="color:#666">\${stack.length} values: </span>\`
       : '';
-    stackVals.innerHTML = count + preview.map(v => `<span class="val">${v}</span>`).join(' ');
+    stackVals.innerHTML = count + preview.map(v => \`<span class="val">\${v}</span>\`).join(' ');
   }
 }
 
@@ -373,7 +376,7 @@ function showStacks(stack, memory, memoryPointer) {
 }
 
 function parseIndexRange(query, maxIndex) {
-  const match = query.match(/^(-?\d*)\s*:\s*(-?\d*)$/);
+  const match = query.match(/^(-?\\d*)\\s*:\\s*(-?\\d*)$/);
   if (!match) return null;
   const start = match[1] === '' ? 0 : Number(match[1]);
   const end = match[2] === '' ? maxIndex : Number(match[2]);
@@ -419,19 +422,19 @@ function renderStacks() {
   );
   const orderedStackIndexes = orderedIndexes(stackIndexes, stackOrder.value);
   const stackMatches = stackIndexes.length;
-  const stackLines = orderedStackIndexes.map(index => `${index}: ${lastStack[index]}`);
+  const stackLines = orderedStackIndexes.map(index => \`\${index}: \${lastStack[index]}\`);
 
   const memoryIndexes = Object.keys(lastMemory).sort((a, b) => Number(a) - Number(b));
   const memoryMaxIndex = memoryIndexes.length ? Number(memoryIndexes[memoryIndexes.length - 1]) : 0;
   const matchingMemoryIndexes = matchingIndexes(memoryIndexes, index => lastMemory[index], memoryRangeQuery, memoryMaxIndex);
   const orderedMemoryIndexes = orderedIndexes(matchingMemoryIndexes, memoryOrder.value);
   const memoryMatches = matchingMemoryIndexes.length;
-  const memoryLines = orderedMemoryIndexes.map(index => `${Number(index) === lastMemoryPointer ? '* ' : '  '}${index}: ${lastMemory[index]}`);
+  const memoryLines = orderedMemoryIndexes.map(index => \`\${Number(index) === lastMemoryPointer ? '* ' : '  '}\${index}: \${lastMemory[index]}\`);
   const stackTruncated = stackMatches > maxResults;
   const memoryTruncated = memoryMatches > maxResults;
-  stackViewValues.textContent = stackLines.length ? stackLines.join('\n') : 'empty';
-  memoryViewValues.textContent = memoryLines.length ? memoryLines.join('\n') : 'empty';
-  stackSearchStatus.textContent = `${stackMatches} stack / ${memoryMatches} memory match${stackMatches + memoryMatches === 1 ? '' : 'es'}${stackTruncated || memoryTruncated ? ' (showing first 5,000 per list)' : ''}`;
+  stackViewValues.textContent = stackLines.length ? stackLines.join('\\n') : 'empty';
+  memoryViewValues.textContent = memoryLines.length ? memoryLines.join('\\n') : 'empty';
+  stackSearchStatus.textContent = \`\${stackMatches} stack / \${memoryMatches} memory match\${stackMatches + memoryMatches === 1 ? '' : 'es'}\${stackTruncated || memoryTruncated ? ' (showing first 5,000 per list)' : ''}\`;
 }
 // ── TURBO WORKER ─────────────────────────────────────────────
 let turboWorker = null;
@@ -439,8 +442,8 @@ let turboWorkerBusy = false;
 
 function getTurboWorker() {
   if (turboWorker) return turboWorker;
-  const workerSrc = `
-    importScripts(${JSON.stringify(new URL('/interpreter?v=__VERSION_NUM__', location.origin).href)});
+  const workerSrc = \`
+    importScripts(\${JSON.stringify(new URL('/interpreter?v=__VERSION_NUM__', location.origin).href)});
     self.onmessage = function(e) {
       const { code, w, h, maxSteps } = e.data;
       const interp = new BefungeLogicInterpreter(code, w, h, maxSteps);
@@ -459,7 +462,7 @@ function getTurboWorker() {
         [pixelBuf.buffer]
       );
     };
-  `;
+  \`;
   const blob = new Blob([workerSrc], { type: 'application/javascript' });
   const url = URL.createObjectURL(blob);
   turboWorker = new Worker(url);
@@ -555,8 +558,8 @@ function run() {
       clearActiveCellHighlight();
       btnRun.classList.remove('running');
       btnRun.textContent = '▶ Run';
-      if (error) { setStatus(`⚠ ${error}`, 'err'); } 
-      else { setStatus(`Done — ${steps} steps`, 'ok'); }
+      if (error) { setStatus(\`⚠ \${error}\`, 'err'); } 
+      else { setStatus(\`Done — \${steps} steps\`, 'ok'); }
     };
     worker.onerror = (e) => {
       turboWorkerBusy = false;
@@ -584,9 +587,9 @@ function run() {
       for (let i = 0; i < chunkSize; i++) {
         if (!runInterp.running) break;
         if (runInterp.steps >= runInterp.maxSteps) {
-          runInterp.error = `Step limit reached`;
+          runInterp.error = \`Step limit reached\`;
           updateDisplay(runInterp, w, h);
-          setStatus(`⚠ ${runInterp.error}`, 'err');
+          setStatus(\`⚠ \${runInterp.error}\`, 'err');
           stopAutoRun();
           return;
         }
@@ -594,7 +597,7 @@ function run() {
         if (cont) runInterp.steps++;
         if (runInterp.error) {
           updateDisplay(runInterp, w, h);
-          setStatus(`⚠ ${runInterp.error}`, 'err');
+          setStatus(\`⚠ \${runInterp.error}\`, 'err');
           stopAutoRun();
           return;
         }
@@ -602,11 +605,11 @@ function run() {
       }
       updateDisplay(runInterp, w, h);
       if (!cont || !runInterp.running) {
-        setStatus(`Done — ${runInterp.steps} steps`, 'ok');
+        setStatus(\`Done — \${runInterp.steps} steps\`, 'ok');
         stopAutoRun();
         return;
       }
-      setStatus(`Running… ${runInterp.steps} steps`, 'ok');
+      setStatus(\`Running… \${runInterp.steps} steps\`, 'ok');
       const delay = getStepDelayMs();
       runTimer = setTimeout(tick, delay);
     } catch (e) {
@@ -638,8 +641,8 @@ function stepOnce() {
   if (cont) stepInterp.steps++;
   updateDisplay(stepInterp, stepW, stepH);
   highlightActiveCell(stepInterp);
-  setStatus(`Step ${stepInterp.steps} — IP(${stepInterp.ip.x},${stepInterp.ip.y})`);
-  if (!cont || !stepInterp.running) { setStatus(`Done — ${stepInterp.steps} steps`, 'ok'); stepInterp = null; }
+  setStatus(\`Step \${stepInterp.steps} — IP(\${stepInterp.ip.x},\${stepInterp.ip.y})\`);
+  if (!cont || !stepInterp.running) { setStatus(\`Done — \${stepInterp.steps} steps\`, 'ok'); stepInterp = null; }
 }
 
 // ── CLEAR OUTPUT ─────────────────────────────────────────────
@@ -675,9 +678,9 @@ inpH.addEventListener('change', () => setupCanvas(parseInt(inpW.value)||32, pars
 // ── INIT ──────────────────────────────────────────────────────
 setMode('text');
 setupCanvas(32, 32);
-aceEditor.setValue(bundledExamples[0]?.code || `0 0 & . 0 1 & . 1 0 & . 1 1 & . %`, -1);
+aceEditor.setValue(bundledExamples[0]?.code || \`0 0 & . 0 1 & . 1 0 & . 1 1 & . %\`, -1);
 setDirectionLabel({ x: 1, y: 0 });
 clearActiveCellHighlight();
 </script>
 </body>
-</html>
+</html>`;
