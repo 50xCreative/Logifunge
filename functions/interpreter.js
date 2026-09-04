@@ -33,7 +33,8 @@ export async function onRequestGet(context) {
     });
   }
 
-  const assetUrl = new URL(`/interpreters/interpreter_${version}.js`, url.origin);
+  const filename = version === 'latest' ? 'interpreter_latest.js' : `interpreter_v${version}.js`;
+  const assetUrl = new URL(`/interpreters/${filename}`, url.origin);
   const assetResponse = await env.ASSETS.fetch(new Request(assetUrl.toString(), request));
 
   if (!assetResponse.ok) {
