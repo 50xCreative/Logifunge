@@ -326,7 +326,7 @@
       document.body.appendChild(textContent);
 
       textContent.innerHTML = tokens.map(token => {
-        const href = token.startsWith('v') ? `/${token}/index.html` : '#';
+        const href = token.startsWith('v') ? `/${token}` : '#';
         return `<a href="${href}">${token}</a>`;
       }).join(' ');
 
