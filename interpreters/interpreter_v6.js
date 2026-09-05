@@ -123,6 +123,9 @@ class BefungeLogicInterpreter {
     this.steps = 0;
     this.maxSteps = maxSteps;
     this.error = null;
+    this.context = new AudioContext();
+    this.lastNote = null;
+    this.osc_type = 'sine';
 
     // Pre-scan for subroutine and loop label positions
     this.labels = {};   // name -> {x, y} of char after :[name]
@@ -131,6 +134,39 @@ class BefungeLogicInterpreter {
     this.forEnds   = {}; // name -> {x, y} of char after )[name]
     this.forStack  = []; // runtime stack of active for-loop frames: {name, count, executed, start}
     this._scanLabels();
+  }
+
+
+
+  _tone(frequency, duration) {
+      const oscillator = this.context.createOscillator();
+      const gainNode = this.context.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(this.context.destination);
+
+      oscillator.type = this.osc_type;
+      oscillator.frequency.value = frequency;
+
+      gainNode.gain.setValueAtTime(1, this.context.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, this.context.currentTime + duration);
+
+      oscillator.start();
+      oscillator.stop(this.context.currentTime + duration);
+
+      const noteInfo = { isDone: false };
+
+      oscillator.onended = () => {
+          noteInfo.isDone = true;
+          oscillator.disconnect();
+          gainNode.disconnect();
+      };
+
+      return noteInfo;
+  }
+
+  _noteDone() {
+      return this.lastNote ? this.lastNote.isDone : false;
   }
 
   // Scan the entire grid once for D[name] and {[name] markers. Each marker
@@ -730,6 +766,18 @@ class BefungeLogicInterpreter {
         break;
       }
       case 's': {const v = this._pop(); this._push(Math.sign(v)); break;}
+
+      case 'T': {
+        const duration = this._pop() / 1000;
+        const note = this._pop();
+        this._tone(note, duration);
+        break;
+      }
+
+      case 't': {
+        const is_playing = this._noteDone();
+        this._push(+is_playing);
+      }
 
       default: break;
     }
