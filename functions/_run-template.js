@@ -7,7 +7,7 @@ export const RUN_HTML_TEMPLATE = `<!DOCTYPE html>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>LOGIFUNGE — an esoteric logic-gate programming language IDE</title>
+  <title>Logifunge IDE</title>
   <meta name="description" content="LOGIFUNGE is a browser-based esoteric programming language built on Befunge-style 2D movement and boolean logic gates (AND, OR, XOR, NAND, NOR, XNOR). Write, step through, and run programs with live text or pixel output — no install required." />
   <meta name="keywords" content="logifunge, esoteric programming language, esolang, befunge, logic gates, boolean logic, online IDE, code playground" />
   <meta name="author" content="LOGIFUNGE" />
@@ -16,7 +16,7 @@ export const RUN_HTML_TEMPLATE = `<!DOCTYPE html>
 
   <!-- Open Graph / social embeds -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="LOGIFUNGE — an esoteric logic-gate programming language IDE" />
+  <meta property="og:title" content="Logifunge IDE" />
   <meta property="og:description" content="A browser-based esoteric language combining Befunge-style 2D movement with boolean logic gates. Write, step, and run code with live text or pixel output." />
   <meta property="og:url" content="https://logifunge.pages.dev/__VERSION__/" />
   <meta property="og:site_name" content="LOGIFUNGE" />
@@ -26,7 +26,7 @@ export const RUN_HTML_TEMPLATE = `<!DOCTYPE html>
 
   <!-- Twitter card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="LOGIFUNGE — an esoteric logic-gate programming language IDE" />
+  <meta name="twitter:title" content="Logifunge IDE" />
   <meta name="twitter:description" content="A browser-based esoteric language combining Befunge-style 2D movement with boolean logic gates. Write, step, and run code with live text or pixel output." />
   <meta name="twitter:image" content="https://logifunge.pages.dev/og-image.png" />
 
