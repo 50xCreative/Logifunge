@@ -102,7 +102,7 @@ var LogifungeHighlightRules = function() {
       { token: 'constant.numeric.logifunge', regex: /[0-9]/ },
 
       // ── Stack manipulation ──
-      { token: 'keyword.operator.stack.logifunge', regex: /[:\\$W+\-*\/lUAsm]/ },
+      { token: 'keyword.operator.stack.logifunge', regex: /[:\\$W+\-*\/lUAsmo]/ },
 
       // ── Whitespace (no-op cell) ──
       { token: 'text', regex: /\s+/ },
