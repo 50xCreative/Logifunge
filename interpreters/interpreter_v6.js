@@ -136,39 +136,6 @@ class BefungeLogicInterpreter {
     this._scanLabels();
   }
 
-
-
-  _tone(frequency, duration) {
-      const oscillator = this.context.createOscillator();
-      const gainNode = this.context.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(this.context.destination);
-
-      oscillator.type = this.osc_type;
-      oscillator.frequency.value = frequency;
-
-      gainNode.gain.setValueAtTime(1, this.context.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.0001, this.context.currentTime + duration);
-
-      oscillator.start();
-      oscillator.stop(this.context.currentTime + duration);
-
-      const noteInfo = { isDone: false };
-
-      oscillator.onended = () => {
-          noteInfo.isDone = true;
-          oscillator.disconnect();
-          gainNode.disconnect();
-      };
-
-      return noteInfo;
-  }
-
-  _noteDone() {
-      return this.lastNote ? this.lastNote.isDone : false;
-  }
-
   // Scan the entire grid once for D[name] and {[name] markers. Each marker
   // may be written horizontally (D immediately followed by [ to its right)
   // or vertically (D immediately followed by [ directly below it, with the
@@ -745,7 +712,6 @@ class BefungeLogicInterpreter {
         break;
       }
 
-      // Elbow redirect: keep going straight on non-0, turn 90° clockwise on 0
       case 'E': {
         const v = this._pop();
         if (v === 0) {
@@ -759,24 +725,23 @@ class BefungeLogicInterpreter {
 
       case 'A': {const v = this._pop(); this._push(Math.abs(v)); break}
       case 'm': {
-        if (!this._requireStackDepth(2, "Requires mod(a, b)")) return false;
-        const b = this._pop();
-        const a = this._pop();
+        if (!this._requireStackDepth(2)) return this._fail('Mod requires mod(a, b)');
+        const b = this._pop(), a = this._pop();
+        if (b === 0) return this._fail('Mod by zero', cell, x, y);
         this._push(a % b);
         break;
       }
       case 's': {const v = this._pop(); this._push(Math.sign(v)); break;}
 
-      case 'T': {
-        const duration = this._pop() / 1000;
-        const note = this._pop();
-        this._tone(note, duration);
+      case 'o': {
+        if (!this._requireStackDepth(2)) return this._fail('Log requires log(a, b)');
+        const b = this._pop(), a = this._pop();
+        if (a <= 0) return this._fail('Log requires a positive value', cell, x, y);
+        if (b <= 0 || b === 1) return this._fail('Log base must be positive and not equal to 1', cell, x, y);
+        const raw = math.log(a, b);
+        const rounded = Math.round(raw);
+        this._push(Math.abs(raw - rounded) < 1e-9 ? rounded : Math.floor(raw));
         break;
-      }
-
-      case 't': {
-        const is_playing = this._noteDone();
-        this._push(+is_playing);
       }
 
       default: break;
