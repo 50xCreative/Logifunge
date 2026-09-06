@@ -123,9 +123,6 @@ class BefungeLogicInterpreter {
     this.steps = 0;
     this.maxSteps = maxSteps;
     this.error = null;
-    this.context = new AudioContext();
-    this.lastNote = null;
-    this.osc_type = 'sine';
 
     // Pre-scan for subroutine and loop label positions
     this.labels = {};   // name -> {x, y} of char after :[name]
