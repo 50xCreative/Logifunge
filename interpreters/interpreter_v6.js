@@ -753,7 +753,7 @@ class BefungeLogicInterpreter {
         const b = this._pop(), a = this._pop();
         if (a <= 0) return this._fail('Log requires a positive value', cell, x, y);
         if (b <= 0 || b === 1) return this._fail('Log base must be positive and not equal to 1', cell, x, y);
-        const raw = _integerLog(a, b);
+        const raw = this._integerLog(a, b);
         const rounded = Math.round(raw);
         this._push(Math.abs(raw - rounded) < 1e-9 ? rounded : Math.floor(raw));
         break;
