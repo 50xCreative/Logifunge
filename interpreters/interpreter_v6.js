@@ -295,6 +295,24 @@ class BefungeLogicInterpreter {
     return guess;
   }
 
+  _integerLog(x, n) {
+    x = BigInt(x);
+    n = BigInt(n);
+
+    if (n < 2n) throw new RangeError("base n must be >= 2");
+    if (x < 1n) throw new RangeError("x must be >= 1");
+
+    let count = 0;
+    let value = 1n;
+
+    while (value * n <= x) {
+      value *= n;
+      count++;
+    }
+
+    return count;
+  }
+
   _push(v) { this.stack.push(v); }
   _pop() { return this.stack.length ? this.stack.pop() : 0; }
   _peek() { return this.stack.length ? this.stack[this.stack.length - 1] : 0; }
@@ -735,7 +753,7 @@ class BefungeLogicInterpreter {
         const b = this._pop(), a = this._pop();
         if (a <= 0) return this._fail('Log requires a positive value', cell, x, y);
         if (b <= 0 || b === 1) return this._fail('Log base must be positive and not equal to 1', cell, x, y);
-        const raw = math.log(a, b);
+        const raw = _integerLog(a, b);
         const rounded = Math.round(raw);
         this._push(Math.abs(raw - rounded) < 1e-9 ? rounded : Math.floor(raw));
         break;
