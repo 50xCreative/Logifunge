@@ -225,18 +225,35 @@ class BefungeLogicInterpreter {
   }
 
   // Wraps an arbitrary {x, y} position using the same rule _advance() uses:
-  // y wraps across the number of rows, x wraps within that row's width.
-  // Returns a new object; does not mutate the input.
+  // y wraps across the number of rows, x wraps within the playfield width.
+  //
+  // The playfield is rectangular: its width is the length of the LONGEST
+  // line in the source, not the length of whichever line the IP happens to
+  // be on. Lines are conceptually right-padded with spaces out to that
+  // width (this is standard Befunge behavior, and _getCell already returns
+  // ' ' for any column past the end of a short row). Using each row's own
+  // trimmed length here instead would make blank/short lines wrap early,
+  // silently shifting the IP's x-coordinate whenever it crosses a line
+  // that has no trailing spaces typed on it.
   _wrapXY(pos) {
     const rows = this.grid.length || 1;
     let y = pos.y;
     if (y < 0) y = rows - 1;
     if (y >= rows) y = 0;
-    const rowLen = (this.grid[y] || []).length || 1;
+    const width = this._gridWidth();
     let x = pos.x;
-    if (x < 0) x = rowLen - 1;
-    if (x >= rowLen) x = 0;
+    if (x < 0) x = width - 1;
+    if (x >= width) x = 0;
     return { x, y };
+  }
+
+  // Width of the playfield: the length of the longest row in the grid.
+  _gridWidth() {
+    let width = 1;
+    for (const row of this.grid) {
+      if (row.length > width) width = row.length;
+    }
+    return width;
   }
 
   // Wraps this.ip in place.
