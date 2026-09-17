@@ -115,6 +115,22 @@ class PackedValue {
 }
 
 class BefungeLogicInterpreter {
+  // Capability flags read by the shared IDE template (features.js /
+  // _run-template.js) to decide things like whether to show a stdin
+  // field ('input') or the Pixel/Dual output views ('pixels'). Not read
+  // by this engine itself.
+  static FEATURES = ['movement', 'logic-gates', 'stack', 'memory', 'pixels', 'subroutines', 'loops', 'text', 'ascii-output', 'packing'];
+
+  // Which panels the shared IDE's Stacks view renders, and where each one
+  // reads its data from on the interpreter instance. This is the default
+  // shape (Data Stack + sparse Memory) every vN engine has always shown;
+  // an engine with a different shape (see interpreter_vbrainfrick.js) can
+  // override this to change what the Stacks view displays for it.
+  static STACK_PANELS = [
+    { id: 'stack', label: 'Data Stack', ariaLabel: 'Data stack', searchLabel: 'stack', source: 'stack', type: 'list' },
+    { id: 'memory', label: 'Memory', ariaLabel: 'Memory', searchLabel: 'memory', source: 'memory', type: 'sparse', pointerSource: 'memoryPointer' },
+  ];
+
   static PackedValue = PackedValue;
 
 

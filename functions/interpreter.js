@@ -5,9 +5,10 @@
 // each /vN/ folder at deploy time.
 //
 // Mapping:
-//   /interpreter            -> latest interpreter (pack/unpack variant)
-//   /interpreter?v=latest   -> same as above
-//   /interpreter?v=1..6     -> interpreters/interpreter_vN.js
+//   /interpreter               -> latest interpreter (pack/unpack variant)
+//   /interpreter?v=latest      -> same as above
+//   /interpreter?v=1..6        -> interpreters/interpreter_vN.js
+//   /interpreter?v=brainfrick  -> interpreters/interpreter_vbrainfrick.js
 //
 // The actual JS files are deployed as normal static assets under
 // /interpreters/*.js. This function just resolves the version alias,
@@ -15,7 +16,7 @@
 // returns it with JS content-type + long-lived caching (the version
 // is part of the mapping, so old cached copies are never wrong).
 
-const VALID_VERSIONS = new Set(['1', '2', '3', '4', '5', '6']);
+const VALID_VERSIONS = new Set(['1', '2', '3', '4', '5', '6', 'brainfrick']);
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -33,7 +34,8 @@ export async function onRequestGet(context) {
     });
   }
 
-  const assetUrl = new URL(`/interpreters/interpreter_${version}.js`, url.origin);
+  const filename = version === 'latest' ? 'interpreter_latest.js' : `interpreter_v${version}.js`;
+  const assetUrl = new URL(`/interpreters/${filename}`, url.origin);
   const assetResponse = await env.ASSETS.fetch(new Request(assetUrl.toString(), request));
 
   if (!assetResponse.ok) {

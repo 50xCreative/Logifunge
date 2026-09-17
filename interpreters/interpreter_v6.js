@@ -104,6 +104,22 @@
  */
 
 class BefungeLogicInterpreter {
+  // Capability flags read by the shared IDE template (features.js /
+  // _run-template.js) to decide things like whether to show a stdin
+  // field ('input') or the Pixel/Dual output views ('pixels'). Not read
+  // by this engine itself.
+  static FEATURES = ['movement', 'logic-gates', 'stack', 'memory', 'pixels', 'subroutines', 'loops', 'for-loops', 'text', 'ascii-output', 'exponents', 'elbow-redirect'];
+
+  // Which panels the shared IDE's Stacks view renders, and where each one
+  // reads its data from on the interpreter instance. This is the default
+  // shape (Data Stack + sparse Memory) every vN engine has always shown;
+  // an engine with a different shape (see interpreter_vbrainfrick.js) can
+  // override this to change what the Stacks view displays for it.
+  static STACK_PANELS = [
+    { id: 'stack', label: 'Data Stack', ariaLabel: 'Data stack', searchLabel: 'stack', source: 'stack', type: 'list' },
+    { id: 'memory', label: 'Memory', ariaLabel: 'Memory', searchLabel: 'memory', source: 'memory', type: 'sparse', pointerSource: 'memoryPointer' },
+  ];
+
   constructor(code, pixelWidth = 64, pixelHeight = 64, maxSteps = 1000000) {
     this.sourceCode = code;
     this.grid = this._parseGrid(code);
@@ -225,18 +241,35 @@ class BefungeLogicInterpreter {
   }
 
   // Wraps an arbitrary {x, y} position using the same rule _advance() uses:
-  // y wraps across the number of rows, x wraps within that row's width.
-  // Returns a new object; does not mutate the input.
+  // y wraps across the number of rows, x wraps within the playfield width.
+  //
+  // The playfield is rectangular: its width is the length of the LONGEST
+  // line in the source, not the length of whichever line the IP happens to
+  // be on. Lines are conceptually right-padded with spaces out to that
+  // width (this is standard Befunge behavior, and _getCell already returns
+  // ' ' for any column past the end of a short row). Using each row's own
+  // trimmed length here instead would make blank/short lines wrap early,
+  // silently shifting the IP's x-coordinate whenever it crosses a line
+  // that has no trailing spaces typed on it.
   _wrapXY(pos) {
     const rows = this.grid.length || 1;
     let y = pos.y;
     if (y < 0) y = rows - 1;
     if (y >= rows) y = 0;
-    const rowLen = (this.grid[y] || []).length || 1;
+    const width = this._gridWidth();
     let x = pos.x;
-    if (x < 0) x = rowLen - 1;
-    if (x >= rowLen) x = 0;
+    if (x < 0) x = width - 1;
+    if (x >= width) x = 0;
     return { x, y };
+  }
+
+  // Width of the playfield: the length of the longest row in the grid.
+  _gridWidth() {
+    let width = 1;
+    for (const row of this.grid) {
+      if (row.length > width) width = row.length;
+    }
+    return width;
   }
 
   // Wraps this.ip in place.
@@ -293,6 +326,24 @@ class BefungeLogicInterpreter {
     while (Math.pow(guess + 1, n) <= a) guess++;
     while (guess > 0 && Math.pow(guess, n) > a) guess--;
     return guess;
+  }
+
+  _integerLog(x, n) {
+    x = BigInt(x);
+    n = BigInt(n);
+
+    if (n < 2n) throw new RangeError("base n must be >= 2");
+    if (x < 1n) throw new RangeError("x must be >= 1");
+
+    let count = 0;
+    let value = 1n;
+
+    while (value * n <= x) {
+      value *= n;
+      count++;
+    }
+
+    return count;
   }
 
   _push(v) { this.stack.push(v); }
@@ -709,7 +760,6 @@ class BefungeLogicInterpreter {
         break;
       }
 
-      // Elbow redirect: keep going straight on non-0, turn 90° clockwise on 0
       case 'E': {
         const v = this._pop();
         if (v === 0) {
@@ -723,13 +773,24 @@ class BefungeLogicInterpreter {
 
       case 'A': {const v = this._pop(); this._push(Math.abs(v)); break}
       case 'm': {
-        if (!this._requireStackDepth(2, "Requires mod(a, b)")) return false;
-        const b = this._pop();
-        const a = this._pop();
+        if (!this._requireStackDepth(2)) return this._fail('Mod requires mod(a, b)');
+        const b = this._pop(), a = this._pop();
+        if (b === 0) return this._fail('Mod by zero', cell, x, y);
         this._push(a % b);
         break;
       }
       case 's': {const v = this._pop(); this._push(Math.sign(v)); break;}
+
+      case 'o': {
+        if (!this._requireStackDepth(2)) return this._fail('Log requires log(a, b)');
+        const b = this._pop(), a = this._pop();
+        if (a <= 0) return this._fail('Log requires a positive value', cell, x, y);
+        if (b <= 0 || b === 1) return this._fail('Log base must be positive and not equal to 1', cell, x, y);
+        const raw = this._integerLog(a, b);
+        const rounded = Math.round(raw);
+        this._push(Math.abs(raw - rounded) < 1e-9 ? rounded : Math.floor(raw));
+        break;
+      }
 
       default: break;
     }

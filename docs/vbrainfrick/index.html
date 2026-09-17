@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE vbrainfrick Documentation</title><link rel="stylesheet" href="../docs.css"></head>
+<body data-version="vbrainfrick">
+<main>
+  <section>
+    <h2>What is vbrainfrick?</h2>
+    <p>vbrainfrick is a standard <a href="https://en.wikipedia.org/wiki/Brainfuck">Brainfuck</a> implementation running inside the LOGIFUNGE shared IDE. It isn't a LOGIFUNGE dialect — the grammar is plain, classic Brainfuck — it's here because the same engine interface the <span class="command">v1</span>..<span class="command">v6</span> Befunge-style interpreters use turned out to fit Brainfuck too, so it plugs into the same editor, step debugger, and output views with no changes to any of that shared code.</p>
+    <p>The one real difference from the v1-v6 engines: the instruction pointer here does <i>not</i> move in two dimensions. There's no up, down, or direction-changing instruction. The IP simply reads the source left to right, wrapping to the next line, the way you'd read a page of text.</p>
+  </section>
+
+  <section>
+    <h2>Commands</h2>
+    <table><tr><th>Command</th><th>Effect</th></tr>
+    <tr><td><span class="command">&gt;</span></td><td>Move the tape pointer right.</td></tr>
+    <tr><td><span class="command">&lt;</span></td><td>Move the tape pointer left.</td></tr>
+    <tr><td><span class="command">+</span></td><td>Increment the current cell, wrapping 255 to 0.</td></tr>
+    <tr><td><span class="command">-</span></td><td>Decrement the current cell, wrapping 0 to 255.</td></tr>
+    <tr><td><span class="command">.</span></td><td>Output the current cell as an ASCII character.</td></tr>
+    <tr><td><span class="command">,</span></td><td>Read one character from Input into the current cell. See Input below.</td></tr>
+    <tr><td><span class="command">[</span></td><td>If the current cell is 0, jump forward to just past the matching <span class="command">]</span>.</td></tr>
+    <tr><td><span class="command">]</span></td><td>If the current cell is nonzero, jump back to the matching <span class="command">[</span>.</td></tr>
+    </table>
+    <p>Every other character — letters, digits, punctuation, whitespace — is a comment. It's skipped with no effect, the same way a blank cell does nothing in the v1-v6 engines.</p>
+    <pre>++++++++[>++++++++<-]>+.
+output: A</pre>
+    <p>The loop above runs 8 times, adding 8 to the next cell each pass (64 total), then a trailing <span class="command">+</span> brings it to 65 — <span class="command">A</span> in ASCII — which <span class="command">.</span> prints.</p>
+  </section>
+
+  <section>
+    <h2>The Tape</h2>
+    <p>Brainfuck has one piece of state: a tape of cells, addressed by an integer index, with a single read/write head. There is no separate data stack. The tape is sparse and unbounded in both directions — moving the pointer left of index 0 with <span class="command">&lt;</span> is perfectly legal, unlike a fixed-size array.</p>
+    <p>Because there's no data stack to inspect, the Stacks view for this engine shows only one panel, <b>Tape</b>, instead of the Data Stack + Memory pair the v1-v6 engines show. The <span class="command">*</span> marker in that panel marks the cell the pointer is currently on.</p>
+  </section>
+
+  <section>
+    <h2>Input</h2>
+    <p>Brainfuck's <span class="command">,</span> command reads one character at a time from an input source. The IDE's top bar shows an <b>Input</b> field for this engine — type or paste text into it before pressing Run or Step, and each <span class="command">,</span> pulls the next character's ASCII code off the front of it. Once the field is exhausted, further <span class="command">,</span> reads store 0 in the current cell (the common "EOF is zero" convention).</p>
+    <pre>,[.,]
+Input: hi
+output: hi</pre>
+    <p>This reads and immediately echoes each character until input runs out: <span class="command">,</span> reads one character, the loop body prints it and reads the next, and the loop ends once a read comes back 0.</p>
+  </section>
+
+  <section>
+    <h2>Using the IDE with vbrainfrick</h2>
+    <p>The IDE is the same one the v1-v6 engines use, with a few things tailored for Brainfuck specifically: the Pixel and Dual output views are hidden, since Brainfuck has no pixel output — only <b>Text</b> and <b>Stacks</b> are shown. The direction indicator stays fixed since the IP never changes direction. Step, Run, Speed, Max Steps, and syntax highlighting all work the same as on the other engines' pages.</p>
+    <p><a href="../../vbrainfrick/">Open the vbrainfrick IDE</a></p>
+  </section>
+</main><script src="../docs.js"></script>
+</body></html>

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>LOGIFUNGE — an esoteric logic-gate programming language IDE</title>
+  <title>Logifunge IDE</title>
   <meta name="description" content="LOGIFUNGE is a browser-based esoteric programming language built on Befunge-style 2D movement and boolean logic gates (AND, OR, XOR, NAND, NOR, XNOR). Write, step through, and run programs with live text or pixel output — no install required." />
   <meta name="keywords" content="logifunge, esoteric programming language, esolang, befunge, logic gates, boolean logic, online IDE, code playground" />
   <meta name="author" content="LOGIFUNGE" />
@@ -13,7 +13,7 @@
 
   <!-- Open Graph / social embeds -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="LOGIFUNGE — an esoteric logic-gate programming language IDE" />
+  <meta property="og:title" content="Logifunge IDE" />
   <meta property="og:description" content="A browser-based esoteric language combining Befunge-style 2D movement with boolean logic gates. Write, step, and run code with live text or pixel output." />
   <meta property="og:url" content="https://logifunge.pages.dev/__VERSION__/" />
   <meta property="og:site_name" content="LOGIFUNGE" />
@@ -23,7 +23,7 @@
 
   <!-- Twitter card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="LOGIFUNGE — an esoteric logic-gate programming language IDE" />
+  <meta name="twitter:title" content="Logifunge IDE" />
   <meta name="twitter:description" content="A browser-based esoteric language combining Befunge-style 2D movement with boolean logic gates. Write, step, and run code with live text or pixel output." />
   <meta name="twitter:image" content="https://logifunge.pages.dev/og-image.png" />
 
@@ -47,10 +47,10 @@
   }
   </script>
 
-  <link rel="stylesheet" href="/v6/style.css" />
-  <link rel="stylesheet" href="/v6/logifunge-ace-theme.css" />
+  <link rel="stylesheet" href="/shared/style.css" />
+  <link rel="stylesheet" href="/shared/logifunge-ace-theme.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.min.js"></script>
-  <script src="/v6/mode-logifunge.js"></script>
+  <script src="/shared/mode-logifunge.js"></script>
 </head>
 <body>
 
@@ -93,6 +93,10 @@
   <div id="max-wrap">
     <label for="max-steps">Max Steps</label>
     <input id="max-steps" type="number" value="1000000" min="1000" step="1000" />
+  </div>
+  <div id="input-wrap" hidden>
+    <label for="stdin-input">Input</label>
+    <input id="stdin-input" type="text" placeholder="stdin" autocomplete="off" />
   </div>
   <div id="spacer"></div>
   <span id="status">Ready</span>
@@ -137,35 +141,16 @@
         <input id="stack-index-search" type="search" placeholder="search indexes" autocomplete="off" />
         <span id="stack-search-status"></span>
       </div>
-      <div class="stack-view-section">
-        <div class="stack-view-header">
-          <span>Data Stack</span>
-          <input id="stack-range" type="search" placeholder="range 0:10" aria-label="Data stack index range" autocomplete="off" />
-          <select id="stack-order" aria-label="Data stack display order">
-            <option value="default" selected>Default</option>
-            <option value="ascending">Lowest to Highest</option>
-            <option value="descending">Highest to Lowest</option>
-          </select>
-        </div>
-        <pre id="stack-view-values">empty</pre>
-      </div>
-      <div class="stack-view-section">
-        <div class="stack-view-header">
-          <span>Memory</span>
-          <input id="memory-range" type="search" placeholder="range 0:10" aria-label="Memory index range" autocomplete="off" />
-          <select id="memory-order" aria-label="Memory display order">
-            <option value="default" selected>Default</option>
-            <option value="ascending">Lowest to Highest</option>
-            <option value="descending">Highest to Lowest</option>
-          </select>
-        </div>
-        <pre id="memory-view-values">empty</pre>
-      </div>
+      <!-- Panel sections below are built dynamically from
+           BefungeLogicInterpreter.STACK_PANELS (see "STACK PANELS" in the
+           script), so the Stacks view can show a different set of panels
+           per engine. Falls back to the classic Data Stack + Memory pair
+           when an engine doesn't declare STACK_PANELS. -->
     </div>
   </div>
 </div>
 
-<script src="/__VERSION__/examples.js"></script>
+<script src="/examples/__VERSION__.js"></script>
 <script src="/interpreter?v=__VERSION_NUM__"></script>
 <script>
 // ── ACE EDITOR SETUP ──────────────────────────────────────────
@@ -188,9 +173,7 @@ let stepInterp = null, stepW = 32, stepH = 32;
 let runInterp = null;
 let runTimer = null;
 let activeCellMarker = null;
-let lastStack = [];
-let lastMemory = {};
-let lastMemoryPointer = 0;
+
 
 const bundledExamples = window.examples || [];
 
@@ -218,17 +201,82 @@ const maxStepsInput = document.getElementById('max-steps');
 const dirIndicator= document.getElementById('dir-indicator');
 const ctx         = canvas.getContext('2d');
 const gCtx        = gridCanvas.getContext('2d');
-const stackViewValues = document.getElementById('stack-view-values');
-const memoryViewValues = document.getElementById('memory-view-values');
 const stackValueSearch = document.getElementById('stack-value-search');
 const stackIndexSearch = document.getElementById('stack-index-search');
 const stackSearchStatus = document.getElementById('stack-search-status');
-const stackOrder = document.getElementById('stack-order');
-const memoryOrder = document.getElementById('memory-order');
-const stackRangeInput = document.getElementById('stack-range');
-const memoryRangeInput = document.getElementById('memory-range');
 const btnHighlight = document.getElementById('btn-toggle-highlight');
+const inputWrap = document.getElementById('input-wrap');
+const stdinInput = document.getElementById('stdin-input');
 let isHighlightingOn = false;
+
+// ── FEATURES ──────────────────────────────────────────────────
+// Capability flags declared by the loaded engine (BefungeLogicInterpreter.
+// FEATURES, set in interpreters/interpreter_*.js). An engine that doesn't
+// declare any gets an empty list here, which keeps every feature-gated bit
+// of UI below in its original, always-on-for-vN-engines state.
+const engineFeatures = (typeof BefungeLogicInterpreter !== 'undefined' && Array.isArray(BefungeLogicInterpreter.FEATURES))
+  ? BefungeLogicInterpreter.FEATURES
+  : [];
+const hasInputFeature = engineFeatures.includes('input');
+const hasPixelsFeature = engineFeatures.length === 0 || engineFeatures.includes('pixels');
+
+if (hasInputFeature) inputWrap.hidden = false;
+if (!hasPixelsFeature) {
+  modeBtnPixel.hidden = true;
+  modeBtnBoth.hidden = true;
+  dimWrap.hidden = true;
+}
+
+// ── STACK PANELS ──────────────────────────────────────────────
+// Which panels the Stacks view renders, and where each reads its data from
+// on the interpreter instance. Falls back to the classic Data Stack +
+// Memory pair so engines that don't declare STACK_PANELS render exactly
+// as before.
+const DEFAULT_STACK_PANELS = [
+  { id: 'stack', label: 'Data Stack', ariaLabel: 'Data stack', searchLabel: 'stack', source: 'stack', type: 'list' },
+  { id: 'memory', label: 'Memory', ariaLabel: 'Memory', searchLabel: 'memory', source: 'memory', type: 'sparse', pointerSource: 'memoryPointer' },
+];
+const stackPanelsConfig = (typeof BefungeLogicInterpreter !== 'undefined' && Array.isArray(BefungeLogicInterpreter.STACK_PANELS) && BefungeLogicInterpreter.STACK_PANELS.length)
+  ? BefungeLogicInterpreter.STACK_PANELS
+  : DEFAULT_STACK_PANELS;
+
+const stackPanels = []; // populated by buildStackPanels(): { ...config, valuesEl, rangeInput, orderSelect }
+let lastPanelData = {}; // e.g. { stack: [...], memory: {...}, memoryPointer: 0 } — read generically by source/pointerSource
+
+function buildStackPanels() {
+  stackPanelsConfig.forEach(panel => {
+    const section = document.createElement('div');
+    section.className = 'stack-view-section';
+    if (stackPanelsConfig.length === 1) section.style.gridColumn = '1 / -1';
+
+    const header = document.createElement('div');
+    header.className = 'stack-view-header';
+    const label = panel.ariaLabel || panel.label;
+    header.innerHTML = `
+      <span>${panel.label}</span>
+      <input id="${panel.id}-range" type="search" placeholder="range 0:10" aria-label="${label} index range" autocomplete="off" />
+      <select id="${panel.id}-order" aria-label="${label} display order">
+        <option value="default" selected>Default</option>
+        <option value="ascending">Lowest to Highest</option>
+        <option value="descending">Highest to Lowest</option>
+      </select>
+    `;
+    const pre = document.createElement('pre');
+    pre.id = `${panel.id}-view-values`;
+    pre.textContent = 'empty';
+
+    section.appendChild(header);
+    section.appendChild(pre);
+    stacksOutput.appendChild(section);
+
+    const rangeInput = header.querySelector('input');
+    const orderSelect = header.querySelector('select');
+    rangeInput.addEventListener('input', scheduleStackSearch);
+    orderSelect.addEventListener('change', renderStacks);
+
+    stackPanels.push({ ...panel, valuesEl: pre, rangeInput, orderSelect });
+  });
+}
 
 function toggleHighlighting() {
   isHighlightingOn = !isHighlightingOn;
@@ -271,10 +319,7 @@ function scheduleStackSearch() {
 }
 stackValueSearch.addEventListener('input', scheduleStackSearch);
 stackIndexSearch.addEventListener('input', scheduleStackSearch);
-stackOrder.addEventListener('change', renderStacks);
-memoryOrder.addEventListener('change', renderStacks);
-stackRangeInput.addEventListener('input', scheduleStackSearch);
-memoryRangeInput.addEventListener('input', scheduleStackSearch);
+buildStackPanels();
 
 // ── CANVAS ────────────────────────────────────────────────────
 function setupCanvas(w, h) {
@@ -364,10 +409,12 @@ function showStack(stack) {
 }
 
 
-function showStacks(stack, memory, memoryPointer) {
-  lastStack = stack || [];
-  lastMemory = memory || {};
-  lastMemoryPointer = memoryPointer ?? 0;
+// Accepts anything shaped like an interpreter instance (or a plain object
+// with the same keys, as the turbo worker sends back) — each configured
+// panel pulls its own "source" / "pointerSource" key off of it generically,
+// so this doesn't need to know about "stack" or "memory" specifically.
+function showStacks(data) {
+  lastPanelData = data || {};
   if (outputMode !== 'stacks') return;
   renderStacks();
 }
@@ -388,9 +435,6 @@ function parseIndexRange(query, maxIndex) {
 function renderStacks() {
   const valueQuery = stackValueSearch.value.trim().toLowerCase();
   const indexQuery = stackIndexSearch.value.trim().toLowerCase();
-  const stackRangeQuery = stackRangeInput.value.trim().toLowerCase();
-  const memoryRangeQuery = memoryRangeInput.value.trim().toLowerCase();
-  const hasQuery = valueQuery || indexQuery || stackRangeQuery || memoryRangeQuery;
   const maxResults = 5000;
   function orderedIndexes(indexes, order) {
     if (order === 'ascending') return indexes.slice(0, maxResults);
@@ -400,7 +444,7 @@ function renderStacks() {
     return [...upper, ...lower.filter(index => !upper.includes(index))];
   }
 
-  function matchingIndexes(indexes, valueForIndex, rangeQuery, maxIndex) {
+  function matchingIndexes(indexes, valueForIndex, rangeQuery, maxIndex, hasQuery) {
     if (!hasQuery) return indexes;
     const range = parseIndexRange(rangeQuery, maxIndex);
     return indexes.filter(index => {
@@ -411,27 +455,43 @@ function renderStacks() {
     });
   }
 
-  const stackIndexes = matchingIndexes(
-    Array.from({ length: lastStack.length }, (_, index) => index),
-    index => lastStack[index],
-    stackRangeQuery,
-    Math.max(0, lastStack.length - 1)
-  );
-  const orderedStackIndexes = orderedIndexes(stackIndexes, stackOrder.value);
-  const stackMatches = stackIndexes.length;
-  const stackLines = orderedStackIndexes.map(index => `${index}: ${lastStack[index]}`);
+  const statusParts = [];
+  let anyTruncated = false;
+  let totalMatches = 0;
 
-  const memoryIndexes = Object.keys(lastMemory).sort((a, b) => Number(a) - Number(b));
-  const memoryMaxIndex = memoryIndexes.length ? Number(memoryIndexes[memoryIndexes.length - 1]) : 0;
-  const matchingMemoryIndexes = matchingIndexes(memoryIndexes, index => lastMemory[index], memoryRangeQuery, memoryMaxIndex);
-  const orderedMemoryIndexes = orderedIndexes(matchingMemoryIndexes, memoryOrder.value);
-  const memoryMatches = matchingMemoryIndexes.length;
-  const memoryLines = orderedMemoryIndexes.map(index => `${Number(index) === lastMemoryPointer ? '* ' : '  '}${index}: ${lastMemory[index]}`);
-  const stackTruncated = stackMatches > maxResults;
-  const memoryTruncated = memoryMatches > maxResults;
-  stackViewValues.textContent = stackLines.length ? stackLines.join('\n') : 'empty';
-  memoryViewValues.textContent = memoryLines.length ? memoryLines.join('\n') : 'empty';
-  stackSearchStatus.textContent = `${stackMatches} stack / ${memoryMatches} memory match${stackMatches + memoryMatches === 1 ? '' : 'es'}${stackTruncated || memoryTruncated ? ' (showing first 5,000 per list)' : ''}`;
+  stackPanels.forEach(panel => {
+    const rawData = lastPanelData[panel.source];
+    const rangeQuery = panel.rangeInput.value.trim().toLowerCase();
+    const hasQuery = valueQuery || indexQuery || rangeQuery;
+
+    let indexes, valueForIndex, maxIndex, pointerValue;
+    if (panel.type === 'list') {
+      const list = Array.isArray(rawData) ? rawData : [];
+      indexes = Array.from({ length: list.length }, (_, index) => index);
+      valueForIndex = index => list[index];
+      maxIndex = Math.max(0, list.length - 1);
+    } else {
+      const map = rawData && typeof rawData === 'object' ? rawData : {};
+      indexes = Object.keys(map).sort((a, b) => Number(a) - Number(b));
+      valueForIndex = index => map[index];
+      maxIndex = indexes.length ? Number(indexes[indexes.length - 1]) : 0;
+      pointerValue = panel.pointerSource ? lastPanelData[panel.pointerSource] : undefined;
+    }
+
+    const matched = matchingIndexes(indexes, valueForIndex, rangeQuery, maxIndex, hasQuery);
+    const ordered = orderedIndexes(matched, panel.orderSelect.value);
+    const lines = ordered.map(index => {
+      const marker = pointerValue !== undefined && Number(index) === pointerValue ? '* ' : (panel.type === 'sparse' ? '  ' : '');
+      return `${marker}${index}: ${valueForIndex(index)}`;
+    });
+
+    panel.valuesEl.textContent = lines.length ? lines.join('\n') : 'empty';
+    statusParts.push(`${matched.length} ${panel.searchLabel || panel.label.toLowerCase()}`);
+    totalMatches += matched.length;
+    if (matched.length > maxResults) anyTruncated = true;
+  });
+
+  stackSearchStatus.textContent = `${statusParts.join(' / ')} match${totalMatches === 1 ? '' : 'es'}${anyTruncated ? ' (showing first 5,000 per list)' : ''}`;
 }
 // ── TURBO WORKER ─────────────────────────────────────────────
 let turboWorker = null;
@@ -442,8 +502,9 @@ function getTurboWorker() {
   const workerSrc = `
     importScripts(${JSON.stringify(new URL('/interpreter?v=__VERSION_NUM__', location.origin).href)});
     self.onmessage = function(e) {
-      const { code, w, h, maxSteps } = e.data;
+      const { code, w, h, maxSteps, stdin } = e.data;
       const interp = new BefungeLogicInterpreter(code, w, h, maxSteps);
+      if (stdin !== undefined) interp.stdin = stdin;
       const result = interp.run();
       const pixelBuf = new Uint32Array(result.pixels.length * 3);
       for (let i = 0; i < result.pixels.length; i++) {
@@ -511,7 +572,7 @@ function updateDisplay(interp, w, h) {
   setupCanvas(w, h);
   if (interp.pixels.length) drawPixels(interp.pixels, w, h);
   showStack(interp.stack);
-  showStacks(interp.stack, interp.memory, interp.memoryPointer);
+  showStacks(interp);
   if (!isHighSpeed()) {
     highlightActiveCell(interp);
   }
@@ -551,7 +612,7 @@ function run() {
       setupCanvas(w, h);
       if (pixels.length) drawPixels(pixels, w, h);
       showStack(stack);
-      showStacks(stack, memory, memoryPointer);
+      showStacks({ stack, memory, memoryPointer });
       clearActiveCellHighlight();
       btnRun.classList.remove('running');
       btnRun.textContent = '▶ Run';
@@ -566,11 +627,12 @@ function run() {
       setStatus('Worker Error: ' + e.message, 'err');
     };
     setupCanvas(w, h);
-    worker.postMessage({ code: execCode, w, h, maxSteps: getMaxSteps() });
+    worker.postMessage({ code: execCode, w, h, maxSteps: getMaxSteps(), stdin: hasInputFeature ? stdinInput.value : undefined });
     return;
   }
 
   runInterp = new BefungeLogicInterpreter(execCode, w, h, getMaxSteps());
+  if (hasInputFeature) runInterp.stdin = stdinInput.value;
   runInterp.running = true;
   updateDisplay(runInterp, w, h);
 
@@ -629,6 +691,7 @@ function stepOnce() {
     stepInterp.pixelHeight !== stepH;
   if (shouldResetStepInterp) {
     stepInterp = new BefungeLogicInterpreter(code, stepW, stepH, getMaxSteps());
+    if (hasInputFeature) stepInterp.stdin = stdinInput.value;
     stepInterp.running = true;
     setupCanvas(stepW, stepH);
     setStatus('Step Mode');
@@ -650,7 +713,7 @@ function clearOutput() {
   if (outputMode === 'pixel' || outputMode === 'both') {
     setupCanvas(parseInt(inpW.value)||32, parseInt(inpH.value)||32);
   }
-  if (outputMode === 'stacks') showStacks([], {}, 0);
+  if (outputMode === 'stacks') showStacks({});
   setStatus('Output Cleared');
 }
 
