@@ -1,6 +1,8 @@
-// Auto-generated from run.html — keep in sync manually, or regenerate
-// with a build step if run.html changes. Embedding as a string avoids
-// relying on env.ASSETS.fetch() for the template itself.
+// This is the source of truth for the shared run page — there is no
+// separate run.html anymore (it was an unused duplicate kept only for
+// readability; nothing ever served or imported it, so it was deleted
+// to avoid the two drifting out of sync). Edit this template directly.
+// Embedding it as a string avoids relying on env.ASSETS.fetch().
 export const RUN_HTML_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,6 +56,8 @@ export const RUN_HTML_TEMPLATE = `<!DOCTYPE html>
   <link rel="stylesheet" href="/shared/logifunge-ace-theme.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.min.js"></script>
   <script src="/shared/mode-logifunge.js"></script>
+  <script src="/shared/mode-brainfrick.js"></script>
+  <script src="/shared/mode-malbolge.js"></script>
 </head>
 <body>
 
@@ -116,7 +120,8 @@ export const RUN_HTML_TEMPLATE = `<!DOCTYPE html>
     <div id="editor-pane-header">Source</div>
     <div id="ace-editor"></div>
     <div id="stack-bar">
-      <span style="color:#444;margin-right:4px">Stack</span>
+      <select id="stack-bar-select" aria-label="Stack to display" hidden></select>
+      <span id="stack-bar-label" style="color:#444;margin-right:4px">Stack</span>
       <span id="stack-vals" style="color:#333">empty</span>
     </div>
   </div>
@@ -189,6 +194,8 @@ const canvas      = document.getElementById('pixel-canvas');
 const gridCanvas  = document.getElementById('grid-overlay');
 const statusEl    = document.getElementById('status');
 const stackVals   = document.getElementById('stack-vals');
+const stackBarSelect = document.getElementById('stack-bar-select');
+const stackBarLabel  = document.getElementById('stack-bar-label');
 const dimWrap     = document.getElementById('dim-wrap');
 const inpW        = document.getElementById('inp-w');
 const inpH        = document.getElementById('inp-h');
@@ -211,6 +218,20 @@ const btnHighlight = document.getElementById('btn-toggle-highlight');
 const inputWrap = document.getElementById('input-wrap');
 const stdinInput = document.getElementById('stdin-input');
 let isHighlightingOn = false;
+
+// Which engine this page is serving — substituted per-version by the
+// server (functions/[version].js), e.g. '1'..'6', 'brainfrick', 'malbolge'.
+const LANG_VERSION = '__VERSION_NUM__';
+
+// Each language family gets its own Ace mode (shared/mode-*.js):
+// LOGIFUNGE and all its numbered versions share one highlighter,
+// since they're the same core ISA; brainfrick and malbolge each
+// get their own, since their grammars have nothing in common with it.
+function aceModeForVersion(v) {
+  if (v === 'malbolge') return 'ace/mode/malbolge';
+  if (v === 'brainfrick') return 'ace/mode/brainfrick';
+  return 'ace/mode/logifunge';
+}
 
 // ── FEATURES ──────────────────────────────────────────────────
 // Capability flags declared by the loaded engine (BefungeLogicInterpreter.
@@ -245,6 +266,67 @@ const stackPanelsConfig = (typeof BefungeLogicInterpreter !== 'undefined' && Arr
 
 const stackPanels = []; // populated by buildStackPanels(): { ...config, valuesEl, rangeInput, orderSelect }
 let lastPanelData = {}; // e.g. { stack: [...], memory: {...}, memoryPointer: 0 } — read generically by source/pointerSource
+
+// ── STACK BAR (under the editor) ────────────────────────────────
+// Lets the user pick which of the engine's registered STACK_PANELS shows
+// in the compact bar under the editor. Reuses the same panel configs as
+// the Stacks view, so it works generically for any engine — including
+// ones like Brainfrick that don't have a 'stack' panel at all.
+let selectedStackPanelId = stackPanelsConfig[0] ? stackPanelsConfig[0].id : null;
+
+function initStackBar() {
+  if (stackPanelsConfig.length <= 1) {
+    // Nothing to choose between — keep the old fixed "Stack" label.
+    stackBarSelect.hidden = true;
+    stackBarLabel.textContent = stackPanelsConfig[0] ? stackPanelsConfig[0].label : 'Stack';
+    return;
+  }
+  stackBarLabel.hidden = true;
+  stackBarSelect.hidden = false;
+  stackBarSelect.innerHTML = stackPanelsConfig
+    .map(panel => \`<option value="\${panel.id}">\${panel.label}</option>\`)
+    .join('');
+  stackBarSelect.value = selectedStackPanelId;
+  stackBarSelect.addEventListener('change', () => {
+    selectedStackPanelId = stackBarSelect.value;
+    showStackBar(lastPanelData);
+  });
+}
+initStackBar();
+
+// Renders whichever panel is currently selected in the stack bar, reading
+// its data generically off \`data\` via the panel's declared source/type —
+// the same shape used by the Stacks view's lastPanelData.
+function showStackBar(data) {
+  lastPanelData = data || {};
+  const panel = stackPanelsConfig.find(p => p.id === selectedStackPanelId) || stackPanelsConfig[0];
+  if (!panel) {
+    stackVals.innerHTML = '<span style="color:#333">empty</span>';
+    return;
+  }
+  const raw = lastPanelData[panel.source];
+  if (panel.type === 'list') {
+    const list = Array.isArray(raw) ? raw : [];
+    showStack(list);
+  } else {
+    const map = raw && typeof raw === 'object' ? raw : {};
+    const indexes = Object.keys(map).sort((a, b) => Number(a) - Number(b));
+    const pointerValue = panel.pointerSource ? lastPanelData[panel.pointerSource] : undefined;
+    if (!indexes.length) {
+      stackVals.innerHTML = '<span style="color:#333">empty</span>';
+    } else {
+      const previewLimit = 200;
+      const preview = indexes.slice(-previewLimit);
+      const count = indexes.length > previewLimit
+        ? \`<span style="color:#666">\${indexes.length} values: </span>\`
+        : '';
+      stackVals.innerHTML = count + preview.map(index => {
+        const marker = pointerValue !== undefined && Number(index) === pointerValue ? '*' : '';
+        return \`<span class="val">\${marker}\${index}:\${map[index]}</span>\`;
+      }).join(' ');
+    }
+  }
+}
 
 function buildStackPanels() {
   stackPanelsConfig.forEach(panel => {
@@ -285,7 +367,7 @@ function toggleHighlighting() {
   isHighlightingOn = !isHighlightingOn;
   
   if (isHighlightingOn) {
-    aceEditor.session.setMode('ace/mode/logifunge');
+    aceEditor.session.setMode(aceModeForVersion(LANG_VERSION));
     btnHighlight.style.color = '#fa0'; // Optional: make it gold when on
   } else {
     aceEditor.session.setMode('ace/mode/text');
@@ -574,7 +656,7 @@ function updateDisplay(interp, w, h) {
   if (outputMode === 'text' || outputMode === 'both') textContent.style.color = text ? '#0f8' : '#444';
   setupCanvas(w, h);
   if (interp.pixels.length) drawPixels(interp.pixels, w, h);
-  showStack(interp.stack);
+  showStackBar(interp);
   showStacks(interp);
   if (!isHighSpeed()) {
     highlightActiveCell(interp);
@@ -614,7 +696,7 @@ function run() {
       if (outputMode === 'text' || outputMode === 'both') textContent.style.color = text ? '#0f8' : '#444';
       setupCanvas(w, h);
       if (pixels.length) drawPixels(pixels, w, h);
-      showStack(stack);
+      showStackBar({ stack, memory, memoryPointer });
       showStacks({ stack, memory, memoryPointer });
       clearActiveCellHighlight();
       btnRun.classList.remove('running');
@@ -717,6 +799,7 @@ function clearOutput() {
     setupCanvas(parseInt(inpW.value)||32, parseInt(inpH.value)||32);
   }
   if (outputMode === 'stacks') showStacks({});
+  showStackBar({});
   setStatus('Output Cleared');
 }
 

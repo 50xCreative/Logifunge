@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE malbolge Documentation</title><link rel="stylesheet" href="../docs.css"></head>
+<body data-version="malbolge">
+<main>
+  <section>
+    <h2>What is malbolge?</h2>
+    <p>malbolge is a standard <a href="https://esolangs.org/wiki/Malbolge">Malbolge</a> implementation running inside the LOGIFUNGE shared IDE. Like <span class="command">brainfrick</span>, it isn't a LOGIFUNGE dialect at all &mdash; it's a completely different, unrelated language that happens to fit the same engine interface the <span class="command">v1</span>..<span class="command">v6</span> Befunge-style interpreters use, so it plugs into the same editor, step debugger, and output views with no changes to any of that shared code.</p>
+    <p>Malbolge, invented by Ben Olmstead in 1998, was deliberately designed to be almost impossible to program in. It's a <b>ternary</b> (base-3) virtual machine where every instruction rewrites itself the moment it runs, so a program's own source code is unrecognizable a few steps after it starts &mdash; the language is named after the eighth circle of Dante's hell for a reason. It took two years after Malbolge's release for the first working program (the classic "Hello, world!" below) to appear, and it wasn't written by a human: it was found by a beam-search program trying random instruction sequences.</p>
+  </section>
+
+  <section>
+    <h2>The Machine</h2>
+    <p>Three registers, all starting at 0: <span class="command">A</span> (the accumulator, used by I/O and left holding the result of most operations), <span class="command">C</span> (the code pointer &mdash; the address of the next instruction), and <span class="command">D</span> (the data pointer, used by the data-manipulation instructions). Memory is 59,049 (3<sup>10</sup>) words, addresses 0 to 59048, each word a 10-trit number. Code and data share this one address space, and there is no separate call stack or data stack.</p>
+    <p>The source is scanned left to right; whitespace is skipped entirely and doesn't occupy a memory word. Every other character must be printable ASCII 33-126 that decodes to one of the 8 valid instructions <i>for its position</i> &mdash; Malbolge's opcode is <span class="command">(address + character code) mod 94</span>, so the same character means something different depending on where it sits in the source. A character that isn't a valid instruction at its address is a load-time error. Once the source is loaded, the rest of memory is filled by repeatedly applying the "crazy" operation (see below) to the previous two words.</p>
+  </section>
+
+  <section>
+    <h2>Instructions</h2>
+    <table><tr><th>Command</th><th>Opcode</th><th>Effect</th></tr>
+    <tr><td><span class="command">i</span></td><td>4</td><td><span class="command">C = [D]</span> &mdash; jump: copies the value at <span class="command">[D]</span> into the code pointer.</td></tr>
+    <tr><td><span class="command">&lt;</span></td><td>5</td><td>Print <span class="command">A mod 256</span> as an ASCII character.</td></tr>
+    <tr><td><span class="command">/</span></td><td>23</td><td>Read one character of input into <span class="command">A</span>. A newline is code 10; end-of-file is code 59048.</td></tr>
+    <tr><td><span class="command">*</span></td><td>39</td><td><span class="command">[D] = A = rotate_right([D])</span> &mdash; rotates the value at <span class="command">[D]</span> one trit to the right, and stores the result in both <span class="command">[D]</span> and <span class="command">A</span>.</td></tr>
+    <tr><td><span class="command">j</span></td><td>40</td><td><span class="command">D = [D]</span> &mdash; moves the data pointer to the value it currently points at.</td></tr>
+    <tr><td><span class="command">p</span></td><td>62</td><td><span class="command">[D] = A = CRAZY(A, [D])</span> &mdash; the tritwise "crazy" operation, the only way to write an arbitrary value into memory (see below).</td></tr>
+    <tr><td><span class="command">o</span></td><td>68</td><td>No-op.</td></tr>
+    <tr><td><span class="command">v</span></td><td>81</td><td>Halt the program.</td></tr>
+    </table>
+    <p>After each instruction runs &mdash; including updating <span class="command">C</span> itself, for the jump instruction &mdash; the cell now at <span class="command">[C]</span> is <b>enciphered in place</b> (a fixed mod-94 substitution) if it's still in the 33-126 range. This ordering is exactly why a jump's <i>target</i> gets enciphered instead of the jump instruction itself: <span class="command">C</span> already points at the target by the time the encipher step runs. Finally both <span class="command">C</span> and <span class="command">D</span> are incremented (wrapping at 59049) and the cycle repeats. This self-modification is what makes Malbolge so hostile to write: a working instruction turns into something else the moment it's executed, so a naive loop breaks itself on its second pass. Practical Malbolge programs exploit specific weaknesses in the cipher's 2-cycles to work around this.</p>
+  </section>
+
+  <section>
+    <h2>The Crazy Operation</h2>
+    <p>A tritwise operation on <span class="command">A</span> and <span class="command">[D]</span>: each of the 10 trits of the result is looked up from the corresponding trit of <span class="command">[D]</span> and <span class="command">A</span> in a small fixed table. It's the only instruction that can write an arbitrary value into memory (<span class="command">*</span> can only rotate what's already there), which is why almost every non-trivial Malbolge program leans on it, despite needing several supporting steps to use in practice.</p>
+  </section>
+
+  <section>
+    <h2>Halting and Errors</h2>
+    <p>A program ends when <span class="command">v</span> executes, when <span class="command">C</span> lands on a cell outside 33-126 (the reference interpreter is documented to hang here, which some published Malbolge programs rely on as a happy accident; this engine reports it as a runtime error instead, matching the language specification rather than that bug), or when the step limit is hit.</p>
+  </section>
+
+  <section>
+    <h2>Input</h2>
+    <p>The IDE's top bar shows an <b>Input</b> field for this engine, the same as for brainfrick. <span class="command">/</span> reads one character at a time from it: a newline is code 10, and once the field is exhausted every further <span class="command">/</span> yields 59048, the value the specification defines for end-of-file.</p>
+  </section>
+
+  <section>
+    <h2>Registers and Memory</h2>
+    <p>The Stacks view for this engine shows two panels instead of the usual Data Stack + Memory pair: <b>Registers</b>, a small at-a-glance list of <span class="command">A</span>, <span class="command">C</span>, and <span class="command">D</span>, each entry labeled (e.g. <code>a: 123</code>) so it's clear which value is which register, and <b>Memory</b>, a sparse view showing only the cells the program has actually read or written &mdash; not the full 59,049-word space, almost all of which is deterministic filler generated by the crazy operation and rarely worth inspecting. Malbolge has no separate data stack.</p>
+  </section>
+
+  <section>
+    <h2>Using the IDE with malbolge</h2>
+    <p>The IDE is the same one the v1-v6 and brainfrick engines use, with the same things tailored for a language with no 2D or pixel concept: the Pixel and Dual output views are hidden, since Malbolge has no pixel output &mdash; only <b>Text</b> and <b>Stacks</b> are shown. The editor highlights the source cell the code pointer currently occupies, for as long as it stays inside the region that was actually loaded from source; once <span class="command">C</span> wanders into the crazy-filled memory beyond it (extremely common in real Malbolge programs), there's no source cell left to highlight. Step, Run, Speed, Max Steps, and syntax highlighting all work the same as on the other engines' pages.</p>
+    <p><a href="../../malbolge/">Open the malbolge IDE</a></p>
+  </section>
+</main><script src="../docs.js"></script>
+</body></html>

@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE vbrainfrick Documentation</title><link rel="stylesheet" href="../docs.css"></head>
-<body data-version="vbrainfrick">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE brainfrick Documentation</title><link rel="stylesheet" href="../docs.css"></head>
+<body data-version="brainfrick">
 <main>
   <section>
-    <h2>What is vbrainfrick?</h2>
-    <p>vbrainfrick is a standard <a href="https://en.wikipedia.org/wiki/Brainfuck">Brainfuck</a> implementation running inside the LOGIFUNGE shared IDE. It isn't a LOGIFUNGE dialect — the grammar is plain, classic Brainfuck — it's here because the same engine interface the <span class="command">v1</span>..<span class="command">v6</span> Befunge-style interpreters use turned out to fit Brainfuck too, so it plugs into the same editor, step debugger, and output views with no changes to any of that shared code.</p>
+    <h2>What is brainfrick?</h2>
+    <p>brainfrick is a standard <a href="https://en.wikipedia.org/wiki/Brainfuck">Brainfuck</a> implementation running inside the LOGIFUNGE shared IDE. It isn't a LOGIFUNGE dialect — the grammar is plain, classic Brainfuck — it's here because the same engine interface the <span class="command">v1</span>..<span class="command">v6</span> Befunge-style interpreters use turned out to fit Brainfuck too, so it plugs into the same editor, step debugger, and output views with no changes to any of that shared code.</p>
     <p>The one real difference from the v1-v6 engines: the instruction pointer here does <i>not</i> move in two dimensions. There's no up, down, or direction-changing instruction. The IP simply reads the source left to right, wrapping to the next line, the way you'd read a page of text.</p>
   </section>
 
@@ -43,9 +43,9 @@ output: hi</pre>
   </section>
 
   <section>
-    <h2>Using the IDE with vbrainfrick</h2>
+    <h2>Using the IDE with brainfrick</h2>
     <p>The IDE is the same one the v1-v6 engines use, with a few things tailored for Brainfuck specifically: the Pixel and Dual output views are hidden, since Brainfuck has no pixel output — only <b>Text</b> and <b>Stacks</b> are shown. The direction indicator stays fixed since the IP never changes direction. Step, Run, Speed, Max Steps, and syntax highlighting all work the same as on the other engines' pages.</p>
-    <p><a href="../../vbrainfrick/">Open the vbrainfrick IDE</a></p>
+    <p><a href="../../brainfrick/">Open the brainfrick IDE</a></p>
   </section>
 </main><script src="../docs.js"></script>
 </body></html>

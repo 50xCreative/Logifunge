@@ -109,3 +109,102 @@
   color: #ff3860;
   background: rgba(255, 56, 96, 0.15);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   BRAINFRICK syntax colors for Ace
+   All eight commands get their own color instead of sharing one
+   per pair, so > vs < and + vs - are each identifiable at a glance.
+   Paired commands stay in the same hue family (and share the
+   LOGIFUNGE token family they echo) but sit at a distinct
+   lightness/shade, so the pairing still reads visually while each
+   glyph remains individually distinguishable.
+   ══════════════════════════════════════════════════════════════ */
+
+/* > move right — bright amber, matches LOGIFUNGE's movement/IP color;
+   the "forward" direction gets the fuller-strength shade */
+.ace_support.ace_function.ace_moveright.ace_brainfrick {
+  color: #ffaa00;
+  font-weight: bold;
+}
+
+/* < move left — warm orange, same amber family as > but visually
+   distinct so direction is legible without reading closely */
+.ace_support.ace_function.ace_moveleft.ace_brainfrick {
+  color: #ff8c42;
+  font-weight: bold;
+}
+
+/* + increment — steel blue, matches LOGIFUNGE's stack/math family */
+.ace_keyword.ace_operator.ace_increment.ace_brainfrick {
+  color: #7a9cc6;
+}
+
+/* - decrement — deeper slate blue, same family as + but darker/cooler
+   so "adding" and "subtracting" don't blend together */
+.ace_keyword.ace_operator.ace_decrement.ace_brainfrick {
+  color: #4f6f94;
+}
+
+/* [ loop start — yellow-green, matches LOGIFUNGE's loop family */
+.ace_keyword.ace_control.ace_loopstart.ace_brainfrick {
+  color: #b5e061;
+  font-weight: bold;
+}
+
+/* ] loop end — lime, same family as [ but shifted, echoing the
+   loop/for-loop distinction LOGIFUNGE draws */
+.ace_keyword.ace_control.ace_loopend.ace_brainfrick {
+  color: #7fc93f;
+  font-weight: bold;
+}
+
+/* . output — green, matches the site's text-output color (#0f8) */
+.ace_constant.ace_character.ace_output.ace_brainfrick {
+  color: #33ff99;
+}
+
+/* , input — cyan, pairs visually with output without being confused for it */
+.ace_support.ace_function.ace_input.ace_brainfrick {
+  color: #5ce1e6;
+  font-weight: bold;
+}
+
+/* Anything else — free-form commentary per the Brainfuck spec */
+.ace_comment.ace_line.ace_brainfrick {
+  color: #fff;
+  font-style: italic;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MALBOLGE syntax colors for Ace
+   Malbolge's meaning is position-dependent, so this can only
+   highlight what's visible from the text alone — see the comment
+   at the top of shared/mode-malbolge.js for what each category
+   actually represents.
+   ══════════════════════════════════════════════════════════════ */
+
+/* The eight canonical, un-enciphered opcode letters: i j p / < > o v * —
+   amber, the brightest tier, since these are the characters most
+   hand-written Malbolge actually leans on */
+.ace_keyword.ace_operator.ace_opcode.ace_malbolge {
+  color: #ffaa00;
+  font-weight: bold;
+}
+
+/* Everything else printable — valid ciphertext at *some* address,
+   dimmed so the canonical opcodes above still pop out of the noise */
+.ace_text.ace_ciphertext.ace_malbolge {
+  color: #7a9cc6;
+}
+
+/* Whitespace — skipped entirely at load time */
+.ace_comment.ace_line.ace_malbolge {
+  color: #fff;
+  font-style: italic;
+}
+
+/* Outside printable ASCII 33-126 — a load-time error */
+.ace_invalid.ace_illegal.ace_malbolge {
+  color: #ff3860;
+  background: rgba(255, 56, 96, 0.15);
+}
