@@ -2,87 +2,305 @@
  * Python (Pyodide) Interpreter (Logifunge engine shape: "python")
  *
  * Runs real CPython — via Pyodide, a WebAssembly build of CPython — inside
- * the shared LOGIFUNGE IDE. This is the only engine in the site that isn't
- * an esolang: it's plain Python 3, included so the IDE can be used as a
- * quick, install-free Python scratchpad alongside the esoteric languages.
+ * the shared LOGIFUNGE IDE, set up the same way the LOLCODE engine is: a
+ * plain synchronous `_step()` / `run()` pair, the same Step / Speed /
+ * Max Steps controls, a single "Variables" panel in the Stacks view, and an
+ * active-cell highlight (`ip.endX`) that spans the whole line being executed.
  *
- * === WHY THIS ENGINE LOOKS DIFFERENT FROM THE OTHERS ===
- *   Every other engine here (v1-v6, brainfrick, malbolge) executes one
- *   discrete instruction per `_step()` call, so the shared IDE can drive it
- *   with a synchronous step loop and a real step debugger. Pyodide has no
- *   such hook — a Python program runs as one opaque unit — and loading the
- *   Pyodide runtime itself is an async, one-time network fetch. So instead
- *   of `_step()`/`run()`, this engine exposes a single `runAsync()` method
- *   and declares the `'async'` feature flag. The shared run page (see
- *   functions/_run-template.js) checks for that flag and, for this engine
- *   only, awaits `runAsync()` from the Run button instead of driving the
- *   normal step loop — and hides Step/Speed/Max Steps/Direction/Pixel UI
- *   that don't apply here (also via feature flags: no 'pixels' feature).
+ * === HOW STEPPING WORKS ===
+ *   LOLCODE is our own interpreter, so it can pause anywhere with a JS
+ *   generator. Python here is real CPython inside wasm, and a running
+ *   Pyodide call can't be paused from synchronous JS. So this engine
+ *   records first and replays second:
  *
- * === OUTPUT ===
- *   `sys.stdout`/`sys.stderr` are redirected to in-memory buffers for the
- *   duration of the run and appended to `this.output` (a plain string,
- *   same shape every other engine uses), so `print()` shows up in the
- *   Text output view exactly like `.` does for the other engines.
+ *   1. `prepare()` (async, called once by the IDE before the first step)
+ *      loads Pyodide if needed, then runs the whole program once under
+ *      `sys.settrace`. For every line CPython is about to execute, it
+ *      records the line number, how much output exists so far, and the
+ *      variables in scope. The trace is capped at `maxSteps` line events, so
+ *      an infinite loop ends with a "Step limit reached" error instead of
+ *      hanging the tab.
+ *   2. `_step()` then replays that trace ONE LINE PER CALL, synchronously,
+ *      exactly like every other engine: it moves `ip` to the next line,
+ *      truncates `output` to what had been printed by that point, and
+ *      swaps in that moment's variables. `run()` is the same loop the other
+ *      engines use, so Turbo mode (which runs `run()` in a worker) works too.
+ *
+ *   The one place this differs from a live debugger: the program has already
+ *   finished by the time you press Step. That means `input()` reads from the
+ *   Input field up front (it can't wait for you), and side effects such as
+ *   an infinite `print` loop are cut off at the step cap rather than by Stop.
+ *
+ * === WHAT THE IDE SHOWS ===
+ *   - Highlight: the whole source line about to run (the line is highlighted
+ *     BEFORE it executes, like `pdb`; its effects appear on the next step).
+ *   - Variables panel: the current scope's variables as `name: value`. At
+ *     module level that's the globals; inside a function it's that call's
+ *     locals, with an `in fname()` header first. Modules, functions and
+ *     classes are left out to keep the list readable, and values are
+ *     abbreviated (long strings/collections are cut off).
+ *   - Output: `print()` and stderr, interleaved in the order they happened,
+ *     growing as you step. An uncaught exception adds a normal Python
+ *     traceback at the end and sets the error shown in the status bar.
  *
  * === INPUT ===
- *   The shared IDE's Input field (`this.stdin`, a plain string — see the
- *   'input' feature) is split into lines. Python's `input()` is patched to
- *   pop one line at a time from that list, raising the normal EOFError
- *   once it's exhausted, matching real Python's behavior when stdin runs
- *   out.
+ *   The shared IDE's Input field (`this.stdin`) is split into lines and
+ *   Python's `input()` is patched to pop one per call, raising the usual
+ *   EOFError once they're gone. Every run starts in a fresh namespace.
+ *
+ * === INSTANT RUN ===
+ *   The Speed menu's "Instant" option (feature flag 'instant') skips the
+ *   trace/replay above and calls `runInstant()`, which just executes the
+ *   program at full CPython speed and reports the final output and
+ *   variables — the original, pre-stepping behavior. There's no step
+ *   cap, so an infinite loop will hang the tab, same as it always did.
  *
  * === LOADING ===
- *   Pyodide (~10 MB of wasm) is fetched from the jsDelivr CDN the first
- *   time this engine runs on a page and cached by the browser after that;
- *   `onStatus`, if set, receives progress text ("Loading Python runtime…")
- *   so the IDE can surface it in the status bar during that first fetch.
- *   The loaded runtime is cached on `self.pyodide` so repeated runs in the
- *   same tab (or the same Turbo worker) don't reload it.
+ *   Pyodide (~10 MB of wasm) is served from this site's own /pyodide/<ver>/
+ *   folder (see PYODIDE_VERSION below); jsDelivr is only a fallback if that
+ *   copy can't be loaded. The browser caches it after the first run;
+ *   `onStatus`, if set, receives progress text for the status bar. The
+ *   runtime is cached on `self.pyodide`, so repeat runs in a tab (or a
+ *   Turbo worker) skip the download.
  *
  * === WHAT'S NOT SUPPORTED ===
- *   No pixel output, no step debugger, no Stacks/Memory panels (Python's
- *   real state lives inside the wasm heap, not in a shape this IDE can
- *   inspect) — the Stacks view simply falls back to the shared IDE's
- *   default empty Data Stack + Memory panels. Only pure-Python packages in
- *   the Pyodide distribution are importable; there's no pip/network access
- *   from inside the running program itself.
+ *   No pixel output. Only pure-Python packages in the Pyodide distribution
+ *   are importable, and there's no pip/network access from inside a run.
+ *   Only the code you type is traced — lines inside standard-library or
+ *   other imported modules count as part of the line that called them.
  */
 
-class BefungeLogicInterpreter {
-  // Capability flags read by the shared IDE template. No 'pixels' -> the
-  // Pixel/Dual output views and the W/H dimension fields are hidden.
-  // 'async' -> the IDE awaits runAsync() from Run instead of stepping, and
-  // hides Step/Speed/Max Steps/Direction, which don't apply to Python.
-  static FEATURES = ['text', 'input', 'async'];
+// Runs inside Pyodide. Defines _logifunge_trace(src, stdin_lines, max_steps),
+// which executes `src` once under sys.settrace and returns the recording.
+// (String.raw keeps the "\n" escapes below as Python escapes, not JS ones.)
+const PY_TRACE_RUNNER = String.raw`
+import sys, builtins, reprlib, traceback, types, linecache
 
-  // No engine-specific panels — Python's runtime state isn't something
-  // this IDE can inspect, so the Stacks view just falls back to the
-  // shared default (always-empty) Data Stack + Memory pair.
-  static STACK_PANELS = [];
+_lf_short = reprlib.Repr()
+_lf_short.maxstring = 60
+_lf_short.maxother = 60
+_lf_short.maxlong = 40
+_lf_short.maxlist = 12
+_lf_short.maxtuple = 12
+_lf_short.maxset = 12
+_lf_short.maxdict = 8
+_lf_short.maxlevel = 2
+_lf_hidden = (types.ModuleType, types.FunctionType, types.BuiltinFunctionType, type)
+
+def _lf_show(value):
+    try:
+        return _lf_short.repr(value)
+    except Exception:
+        return '<unprintable>'
+
+def _lf_entries(mapping, header=None):
+    entries = [header] if header else []
+    for name, value in list(mapping.items()):
+        if name.startswith('__') and name.endswith('__'):
+            continue
+        if isinstance(value, _lf_hidden):
+            continue
+        entries.append(name + ': ' + _lf_show(value))
+    return entries
+
+class _LfOut:
+    def __init__(self):
+        self.parts = []
+        self.n = 0
+    def write(self, s):
+        s = str(s)
+        self.parts.append(s)
+        self.n += len(s)
+        return len(s)
+    def flush(self):
+        pass
+    def isatty(self):
+        return False
+
+def _lf_make_input(stdin_lines):
+    stdin_iter = iter(list(stdin_lines))
+    def fake_input(prompt=''):
+        try:
+            return next(stdin_iter)
+        except StopIteration:
+            raise EOFError('EOF when reading a line') from None
+    return fake_input
+
+_LF_USER = '<user>'
+
+# One-line description of an exception, e.g. "ZeroDivisionError: division
+# by zero (line 3)", where the line is the last one in the user's own code.
+def _lf_describe(exc):
+    line = None
+    tb = exc.__traceback__
+    while tb is not None:
+        if tb.tb_frame.f_code.co_filename == _LF_USER:
+            line = tb.tb_lineno
+        tb = tb.tb_next
+    if line is None and isinstance(exc, SyntaxError):
+        line = exc.lineno
+    text = type(exc).__name__
+    detail = exc.msg if isinstance(exc, SyntaxError) else str(exc)
+    if detail:
+        text += ': ' + str(detail)
+    if line is not None:
+        text += ' (line ' + str(line) + ')'
+    return text
+
+# A traceback showing only the user's own frames (hides this runner, the
+# patched input(), and Pyodide's internals).
+def _lf_user_traceback(exc):
+    frames = [f for f in traceback.extract_tb(exc.__traceback__) if f.filename == _LF_USER]
+    text = ''
+    if frames:
+        text = 'Traceback (most recent call last):\n' + ''.join(traceback.format_list(frames))
+    return text + ''.join(traceback.format_exception_only(type(exc), exc))
+
+# --- instant run: no tracing. begin() redirects output/input, the coroutine
+# runs the program, end() restores everything and returns the results.
+_lf_instant = {}
+
+def _logifunge_instant_begin(src, stdin_lines):
+    out = _LfOut()
+    _lf_instant['out'] = out
+    _lf_instant['saved'] = (sys.stdout, sys.stderr, builtins.input)
+    sys.stdout = sys.stderr = out
+    builtins.input = _lf_make_input(stdin_lines)
+    linecache.cache[_LF_USER] = (len(src), None, src.splitlines(True), _LF_USER)
+
+async def _logifunge_instant_run(src, ns):
+    from pyodide.code import eval_code_async
+    try:
+        await eval_code_async(src, ns, filename=_LF_USER)
+    except SystemExit:
+        return None
+    except BaseException as exc:
+        _lf_instant['out'].write(_lf_user_traceback(exc))
+        return _lf_describe(exc)
+    return None
+
+def _logifunge_instant_end(ns):
+    sys.stdout, sys.stderr, builtins.input = _lf_instant['saved']
+    linecache.cache.pop(_LF_USER, None)
+    return {
+        'output': ''.join(_lf_instant['out'].parts),
+        'final': _lf_entries(ns),
+    }
+
+# --- traced run: executes src under sys.settrace and returns the recording
+def _logifunge_trace(src, stdin_lines, max_steps):
+    USER = _LF_USER
+
+    class StepLimit(BaseException):
+        pass
+
+    out = _LfOut()
+    lines, outlens, varidx = [], [], []
+    varsets = [[]]
+    state = {'count': 0, 'last': None}
+
+    def tracer(frame, event, arg):
+        if frame.f_code.co_filename != USER:
+            return None
+        if event == 'line':
+            if state['count'] >= max_steps:
+                raise StepLimit()
+            state['count'] += 1
+            name = frame.f_code.co_name
+            header = None if name == '<module>' else 'in ' + name + '()'
+            snap = _lf_entries(frame.f_locals, header)
+            if snap != state['last']:
+                varsets.append(snap)
+                state['last'] = snap
+            lines.append(frame.f_lineno)
+            outlens.append(out.n)
+            varidx.append(len(varsets) - 1)
+        return tracer
+
+    ns = {'__name__': '__main__', '__builtins__': builtins}
+    error = None
+    saved = (sys.stdout, sys.stderr, builtins.input)
+    sys.stdout = sys.stderr = out
+    builtins.input = _lf_make_input(stdin_lines)
+    linecache.cache[USER] = (len(src), None, src.splitlines(True), USER)
+    try:
+        try:
+            code = compile(src, USER, 'exec')
+        except SyntaxError as exc:
+            error = _lf_describe(exc)
+            out.write(''.join(traceback.format_exception_only(type(exc), exc)))
+        else:
+            sys.settrace(tracer)
+            try:
+                exec(code, ns)
+            except StepLimit:
+                error = 'Step limit (' + str(max_steps) + ') reached - possible infinite loop'
+            except SystemExit:
+                pass
+            except BaseException as exc:
+                error = _lf_describe(exc)
+                out.write(_lf_user_traceback(exc))
+            finally:
+                sys.settrace(None)
+    finally:
+        sys.stdout, sys.stderr, builtins.input = saved
+        linecache.cache.pop(USER, None)
+
+    return {
+        'lines': lines,
+        'outlens': outlens,
+        'varidx': varidx,
+        'varsets': varsets,
+        'output': ''.join(out.parts),
+        'final': _lf_entries(ns),
+        'error': error,
+    }
+`;
+
+class BefungeLogicInterpreter {
+  // No 'pixels' (Python has no pixel output here). Like LOLCODE this engine
+  // is driven by the shared step loop; the only async part is prepare(),
+  // which the IDE awaits once before stepping starts. 'instant' adds the
+  // "Instant" entry to the Speed menu, which calls runInstant() instead.
+  static FEATURES = ['text', 'input', 'instant'];
+
+  // Where the Pyodide runtime lives. The files are served from this site at
+  // /pyodide/<PYODIDE_VERSION>/ (see pyodide/<ver>/README.txt); jsDelivr is
+  // only tried if that copy fails to load.
+  static PYODIDE_VERSION = '0.26.4';
+
+  // One "Variables" list panel — the current scope's variables — instead
+  // of the default Data Stack + Memory pair, same as LOLCODE.
+  static STACK_PANELS = [
+    { id: 'vars', label: 'Variables', ariaLabel: 'Variables', searchLabel: 'variables', source: 'stack', type: 'list' },
+  ];
 
   // Shared across instances so the (large, one-time) Pyodide download and
-  // boot only happens once per page/worker, no matter how many times the
-  // user presses Run.
+  // boot only happens once per page/worker.
   static _pyodidePromise = null;
 
   constructor(code, pixelWidth = 32, pixelHeight = 32, maxSteps = 1000000) {
     this.sourceCode = code;
-    this.ip = { x: 0, y: 0 };       // unused — kept only so shared UI bits that read interp.ip don't break
-    this.dir = { x: 1, y: 0 };      // unused, same reason
-    this.stack = [];                // always empty — see STACK_PANELS note above
-    this.memory = {};                // always empty, same reason
-    this.memoryPointer = 0;
-    this.output = '';               // accumulated stdout+stderr text
-    this.pixels = [];               // unused — Python has no pixel output here
+    this._srcLines = String(code).split('\n');
+
+    this.ip = { x: 0, y: 0, endX: 1 }; // line span highlighted this step
+    this.dir = { x: 1, y: 0 };         // Python has no direction; kept for UI compatibility
+    this.stack = [];                   // Variables panel — swapped in by _step()
+    this.memory = {};                  // unused — kept so nothing reading interp.memory breaks
+    this.memoryPointer = 0;            // unused, same reason
+    this.output = '';
+    this.pixels = [];
     this.pixelWidth = pixelWidth;
     this.pixelHeight = pixelHeight;
-    this.stdin = '';                // fed to input(), one line per call — set before runAsync()
+    this.stdin = '';                   // fed to input(), one line per call — set before prepare()
     this.running = false;
     this.steps = 0;
     this.maxSteps = maxSteps;
     this.error = null;
-    this.onStatus = null;           // optional (message) => void, for load/run progress text
+    this.onStatus = null;              // optional (message) => void, for load/run progress text
+
+    this._trace = null;                // recording from prepare(); replayed by _step()
+    this._pos = 0;
   }
 
   _report(message) {
@@ -91,81 +309,128 @@ class BefungeLogicInterpreter {
     }
   }
 
+  // Directory URL of the copy of Pyodide served by this site. Needs an
+  // absolute origin because in Turbo mode this file runs inside a blob:
+  // worker, where a bare "/pyodide/..." path wouldn't resolve.
+  static _localIndexURL() {
+    const loc = typeof self !== 'undefined' ? self.location : null;
+    const origin = loc && loc.origin && loc.origin !== 'null' ? loc.origin : '';
+    return `${origin}/pyodide/${BefungeLogicInterpreter.PYODIDE_VERSION}/`;
+  }
+
+  // Loads the runtime from one directory URL. Works on the main thread
+  // (injects a <script> tag) and inside a Worker (uses importScripts).
+  static async _loadPyodideFrom(indexURL) {
+    if (typeof importScripts === 'function') {
+      // Worker context (Turbo mode) — synchronous script load.
+      importScripts(indexURL + 'pyodide.js');
+    } else if (typeof self.loadPyodide !== 'function') {
+      // Main-thread context — inject the loader script once.
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = indexURL + 'pyodide.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`Failed to load Pyodide from ${script.src}`));
+        document.head.appendChild(script);
+      });
+    }
+    return self.loadPyodide({ indexURL });
+  }
+
   // Loads Pyodide once per page (or per Turbo worker) and caches it on
-  // `self.pyodide`. Works both on the main thread (injects a <script> tag)
-  // and inside a Worker (uses importScripts), since Turbo mode runs this
-  // same engine file inside a worker via importScripts().
+  // `self.pyodide`: this site's own copy first, jsDelivr only as a fallback.
   static _loadPyodide(onStatus) {
     if (typeof self !== 'undefined' && self.pyodide) return Promise.resolve(self.pyodide);
     if (!BefungeLogicInterpreter._pyodidePromise) {
       BefungeLogicInterpreter._pyodidePromise = (async () => {
-        const PYODIDE_VERSION = '0.26.4';
-        const indexURL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
-        if (typeof onStatus === 'function') onStatus('Loading Python runtime (first run only, then cached)…');
+        const say = msg => { if (typeof onStatus === 'function') onStatus(msg); };
+        say('Loading Python runtime (first run only, then cached)…');
 
-        if (typeof importScripts === 'function') {
-          // Worker context (Turbo mode) — synchronous script load.
-          importScripts(indexURL + 'pyodide.js');
-        } else if (typeof self.loadPyodide !== 'function') {
-          // Main-thread context — inject the loader script once.
-          await new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = indexURL + 'pyodide.js';
-            script.onload = resolve;
-            script.onerror = () => reject(new Error(`Failed to load Pyodide from ${script.src}`));
-            document.head.appendChild(script);
-          });
+        let pyodide;
+        try {
+          pyodide = await BefungeLogicInterpreter._loadPyodideFrom(BefungeLogicInterpreter._localIndexURL());
+        } catch (localErr) {
+          say('Local Python runtime unavailable — trying the CDN…');
+          const cdn = `https://cdn.jsdelivr.net/pyodide/v${BefungeLogicInterpreter.PYODIDE_VERSION}/full/`;
+          try {
+            pyodide = await BefungeLogicInterpreter._loadPyodideFrom(cdn);
+          } catch (cdnErr) {
+            throw new Error(`${cdnErr.message} (the copy on this site failed too: ${localErr.message})`);
+          }
         }
-
-        const pyodide = await self.loadPyodide({ indexURL });
         self.pyodide = pyodide;
         return pyodide;
-      })();
+      })().catch(err => {
+        // Don't cache a failed download — let the next run try again.
+        BefungeLogicInterpreter._pyodidePromise = null;
+        throw err;
+      });
     }
     return BefungeLogicInterpreter._pyodidePromise;
   }
 
-  async runAsync() {
+  // Async setup the IDE awaits before the first _step()/run(): load Pyodide,
+  // then execute the program once under sys.settrace and keep the recording.
+  // Never throws — failures land in `this.error`, like runtime errors do.
+  async prepare() {
+    if (this._trace || this.error) return;
+    try {
+      const pyodide = await BefungeLogicInterpreter._loadPyodide(msg => this._report(msg));
+      this._report('Running…');
+
+      pyodide.runPython(PY_TRACE_RUNNER);
+      const runner = pyodide.globals.get('_logifunge_trace');
+      const stdinLines = pyodide.toPy((this.stdin || '').split('\n'));
+      const proxy = runner(this.sourceCode, stdinLines, this.maxSteps);
+      this._trace = proxy.toJs({ dict_converter: Object.fromEntries });
+      proxy.destroy();
+      stdinLines.destroy();
+      runner.destroy();
+    } catch (err) {
+      this.error = `Pyodide error: ${err && err.message ? err.message : String(err)}`;
+      this.running = false;
+    }
+  }
+
+  // Instant mode: run the program once at full speed, no tracing and no
+  // step cap (the original pre-stepping behavior). Resolves with the same
+  // result shape run() returns; never throws.
+  async runInstant() {
     this.running = true;
     this.steps = 0;
     this.error = null;
     this.output = '';
+    this.stack = [];
 
     try {
       const pyodide = await BefungeLogicInterpreter._loadPyodide(msg => this._report(msg));
       this._report('Running…');
 
-      const stdinLines = (this.stdin || '').split('\n');
-      pyodide.globals.set('_logifunge_stdin_lines', stdinLines);
+      pyodide.runPython(PY_TRACE_RUNNER);
+      const begin = pyodide.globals.get('_logifunge_instant_begin');
+      const runProgram = pyodide.globals.get('_logifunge_instant_run');
+      const end = pyodide.globals.get('_logifunge_instant_end');
+      const stdinLines = pyodide.toPy((this.stdin || '').split('\n'));
+      const ns = pyodide.globals.get('dict')();
+      ns.set('__name__', '__main__');
 
-      // Redirect stdout/stderr to buffers and patch input() to read from
-      // the IDE's Input field, one line per call, EOFError once exhausted
-      // — this mirrors real Python's stdin-exhausted behavior.
-      await pyodide.runPythonAsync(`
-import sys, io, builtins
-sys.stdout = io.StringIO()
-sys.stderr = io.StringIO()
-_logifunge_stdin_iter = iter(list(_logifunge_stdin_lines))
-def _logifunge_input(prompt=''):
-    try:
-        return next(_logifunge_stdin_iter)
-    except StopIteration:
-        raise EOFError('EOF when reading a line')
-builtins.input = _logifunge_input
-`.trim());
+      begin(this.sourceCode, stdinLines);
+      // Resolves to an error description if the program raised, else undefined.
+      const pyError = await runProgram(this.sourceCode, ns);
+      const proxy = end(ns);
+      const result = proxy.toJs({ dict_converter: Object.fromEntries });
 
-      let pyError = null;
-      try {
-        await pyodide.runPythonAsync(this.sourceCode);
-      } catch (err) {
-        pyError = err && err.message ? err.message : String(err);
-      }
-
-      const stdoutText = pyodide.runPython('sys.stdout.getvalue()');
-      const stderrText = pyodide.runPython('sys.stderr.getvalue()');
-      this.output = stdoutText + (stderrText || '');
+      this.output = result.output;
+      this.stack = result.final;
       if (pyError) this.error = pyError;
       this.steps = 1;
+
+      proxy.destroy();
+      ns.destroy();
+      stdinLines.destroy();
+      begin.destroy();
+      runProgram.destroy();
+      end.destroy();
     } catch (err) {
       this.error = `Pyodide error: ${err && err.message ? err.message : String(err)}`;
     } finally {
@@ -183,18 +448,62 @@ builtins.input = _logifunge_input
     };
   }
 
-  // Kept only so nothing that still calls the sync interface outright
-  // crashes with "not a function" — Python has no meaningful discrete
-  // step, and execution is inherently async, so both just fail clearly
-  // and point at runAsync() instead of silently doing the wrong thing.
+  // ---- shared-IDE surface: _step()/run(), matching every other engine ----
+  // Replays one recorded line event per call. Returns false once the
+  // recording is exhausted (and applies the final output, variables, and
+  // any error at that point).
   _step() {
-    this.error = 'Step-by-step execution is not supported for Python — use Run.';
+    const t = this._trace;
+    if (!t) {
+      if (!this.error) this.error = 'Python runtime not ready — the IDE must await prepare() before stepping.';
+      this.running = false;
+      return false;
+    }
+
+    if (this._pos < t.lines.length) {
+      const i = this._pos++;
+      const row = t.lines[i] - 1;
+      const text = this._srcLines[row] || '';
+      const x = text.length - text.trimStart().length;
+      this.ip = { x, y: row, endX: Math.max(text.trimEnd().length, x + 1) };
+      this.output = t.output.slice(0, t.outlens[i]);
+      this.stack = t.varsets[t.varidx[i]];
+      return true;
+    }
+
+    this.output = t.output;
+    this.stack = t.final;
+    if (t.error) this.error = t.error;
     this.running = false;
     return false;
   }
 
   run() {
-    throw new Error('The Python engine is asynchronous — call runAsync() instead of run().');
+    this.running = true;
+    this.steps = 0;
+    while (this.running && this.steps < this.maxSteps) {
+      try {
+        if (!this._step()) break;
+      } catch (err) {
+        this.error = `Runtime error: ${err.message}`;
+        this.running = false;
+        break;
+      }
+      this.steps++;
+    }
+    if (this.running && this.steps >= this.maxSteps) {
+      this.error = `Step limit (${this.maxSteps}) reached — possible infinite loop`;
+      this.running = false;
+    }
+    return {
+      textOutput: this.output,
+      pixels: this.pixels,
+      steps: this.steps,
+      error: this.error,
+      stack: [...this.stack],
+      memory: { ...this.memory },
+      memoryPointer: this.memoryPointer,
+    };
   }
 }
 

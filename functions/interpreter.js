@@ -11,6 +11,7 @@
 //   /interpreter?v=brainfrick  -> interpreters/interpreter_vbrainfrick.js
 //   /interpreter?v=malbolge    -> interpreters/interpreter_vmalbolge.js
 //   /interpreter?v=python      -> interpreters/interpreter_vpython.js
+//   /interpreter?v=lolcode     -> interpreters/interpreter_vlolcode.js
 //
 // The actual JS files are deployed as normal static assets under
 // /interpreters/*.js. This function just resolves the version alias,
@@ -18,7 +19,7 @@
 // returns it with JS content-type + long-lived caching (the version
 // is part of the mapping, so old cached copies are never wrong).
 
-const VALID_VERSIONS = new Set(['1', '2', '3', '4', '5', '6', 'brainfrick', 'malbolge', 'python']);
+const VALID_VERSIONS = new Set(['1', '2', '3', '4', '5', '6', 'brainfrick', 'malbolge', 'python', 'lolcode']);
 
 export async function onRequestGet(context) {
   const { request, env } = context;

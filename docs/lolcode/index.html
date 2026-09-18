@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE lolcode Documentation</title><link rel="stylesheet" href="../docs.css"></head>
+<body data-version="lolcode">
+<main>
+  <section>
+    <h2>What is lolcode?</h2>
+    <p>lolcode is a JavaScript reimplementation of <a href="https://en.wikipedia.org/wiki/LOLCODE">LOLCODE</a> — the LOLcat-speak esolang — running inside the LOGIFUNGE shared IDE. It isn't a LOGIFUNGE dialect; the grammar follows the reference C implementation, <span class="command">lci</span>, closely enough to run its own style of example programs (declarations, conditionals, switches, loops, and functions including recursion).</p>
+    <p>Unlike v1-v6, brainfrick, and malbolge — which step through source one <i>character</i> at a time — LOLCODE's vocabulary is made of multi-character words (<span class="command">VISIBLE</span>, <span class="command">SUM</span>, <span class="command">OF</span>, <span class="command">MKAY</span>, ...), so this engine's step consumes one lexical <i>token</i> per step instead: one word, number, string, or comment. The active-cell highlight in the editor spans the whole token being executed rather than a single character.</p>
+  </section>
+
+  <section>
+    <h2>Program structure</h2>
+    <table><tr><th>Keyword</th><th>Effect</th></tr>
+    <tr><td><span class="command">HAI</span></td><td>Opens the program. An optional version number (e.g. <span class="command">1.2</span>) may follow.</td></tr>
+    <tr><td><span class="command">KTHXBYE</span></td><td>Ends the program.</td></tr>
+    <tr><td><span class="command">VISIBLE</span> <i>expr</i> [<span class="command">AN</span> <i>expr</i> ...] [<span class="command">!</span>]</td><td>Prints the concatenation of every expression, followed by a newline — unless a trailing <span class="command">!</span> suppresses it.</td></tr>
+    <tr><td><span class="command">GIMMEH</span> <i>varname</i></td><td>Reads one line from Input into a variable. See Input below.</td></tr>
+    <tr><td><span class="command">I HAS A</span> <i>name</i> [<span class="command">ITZ</span> <i>expr</i>]</td><td>Declares a variable in the current scope, optionally with a starting value (defaults to <span class="command">NOOB</span>).</td></tr>
+    <tr><td><i>name</i> <span class="command">R</span> <i>expr</i></td><td>Assigns to an already-declared variable.</td></tr>
+    <tr><td><i>name</i> <span class="command">IS NOW A</span> <i>TYPE</i></td><td>Casts a variable's value to a new type in place.</td></tr>
+    </table>
+    <pre>HAI 1.2
+VISIBLE "HELLO WORLD!"
+KTHXBYE
+output: HELLO WORLD!</pre>
+  </section>
+
+  <section>
+    <h2>IT and expressions</h2>
+    <p>Every scope has an implicit variable, <span class="command">IT</span>, which holds the result of the last bare expression statement. This matters for control flow: a condition is written as its own statement (setting <span class="command">IT</span>), and the following <span class="command">O RLY?</span> / <span class="command">WTF?</span> reads it.</p>
+    <pre>BOTH SAEM AGE AN 20
+O RLY?
+    YA RLY
+        VISIBLE "TWENTY!"
+    NO WAI
+        VISIBLE "NOT TWENTY"
+OIC</pre>
+    <p>Prefix math and boolean operators work the same way as arguments: <span class="command">SUM OF</span> <i>a</i> <span class="command">AN</span> <i>b</i>, <span class="command">DIFF OF</span>, <span class="command">PRODUKT OF</span>, <span class="command">QUOSHUNT OF</span>, <span class="command">MOD OF</span>, <span class="command">BIGGR OF</span>, <span class="command">SMALLR OF</span> for arithmetic; <span class="command">BOTH OF</span>, <span class="command">EITHER OF</span>, <span class="command">WON OF</span>, <span class="command">NOT</span>, <span class="command">ALL OF ... MKAY</span>, <span class="command">ANY OF ... MKAY</span> for booleans; <span class="command">BOTH SAEM</span> and <span class="command">DIFFRINT</span> for equality; <span class="command">SMOOSH ... MKAY</span> to concatenate strings; and <span class="command">MAEK</span> <i>expr</i> <span class="command">A</span> <i>TYPE</i> to cast without mutating the original.</p>
+  </section>
+
+  <section>
+    <h2>Loops, switches, and functions</h2>
+    <p><span class="command">IM IN YR</span> <i>label</i> [<span class="command">UPPIN</span>/<span class="command">NERFIN</span> <span class="command">YR</span> <i>var</i>] [<span class="command">TIL</span>/<span class="command">WILE</span> <i>expr</i>] ... <span class="command">IM OUTTA YR</span> <i>label</i> is a loop with an optional per-iteration counter and an optional exit condition, checked before each pass; <span class="command">GTFO</span> breaks out early.</p>
+    <pre>IM IN YR LOOP UPPIN YR COUNT TIL BOTH SAEM COUNT AN 5
+    VISIBLE COUNT
+IM OUTTA YR LOOP
+output: 0 1 2 3 4 (one per line)</pre>
+    <p><span class="command">WTF?</span> ... <span class="command">OMG</span> <i>literal</i> ... <span class="command">OMGWTF</span> ... <span class="command">OIC</span> is a switch on <span class="command">IT</span>, with C-style fallthrough between <span class="command">OMG</span> cases until a <span class="command">GTFO</span>.</p>
+    <p><span class="command">HOW IZ I</span> <i>name</i> [<span class="command">YR</span> <i>param</i> [<span class="command">AN YR</span> <i>param</i> ...]] ... <span class="command">IF U SAY SO</span> defines a function; <span class="command">FOUND YR</span> <i>expr</i> returns a value. Calls use <span class="command">I IZ</span> <i>name</i> [<span class="command">YR</span> <i>arg</i> [<span class="command">AN YR</span> <i>arg</i> ...]] <span class="command">MKAY</span>, and recursion works normally since each call gets its own scope.</p>
+    <pre>HOW IZ I FACTORIAL YR N
+    BOTH SAEM N AN 0
+    O RLY?
+        YA RLY
+            FOUND YR 1
+        NO WAI
+            FOUND YR PRODUKT OF N AN I IZ FACTORIAL YR DIFF OF N AN 1 MKAY
+    OIC
+IF U SAY SO
+VISIBLE I IZ FACTORIAL YR 5 MKAY
+output: 120</pre>
+  </section>
+
+  <section>
+    <h2>Input</h2>
+    <p>The IDE's top bar shows an <b>Input</b> field for this engine. Whatever you type there is split into lines before the program runs, and each <span class="command">GIMMEH</span> pops the next line off the front of it as a <span class="command">YARN</span> (string). Once the field's lines are exhausted, further <span class="command">GIMMEH</span> calls read an empty string.</p>
+  </section>
+
+  <section>
+    <h2>What's not supported</h2>
+    <p>Arrays (<span class="command">BUKKIT</span>), module bindings (<span class="command">CAN HAS?</span>), and concurrent threading are not implemented — this covers the core imperative language: variables, arithmetic and boolean prefix operators, string concatenation and casts, conditionals, switches, loops, and functions with recursion.</p>
+  </section>
+
+  <section>
+    <h2>Using the IDE with lolcode</h2>
+    <p>The IDE is the same one the other engines use, with a couple of things tailored for lolcode specifically: the Pixel and Dual output views are hidden, since LOLCODE has no pixel output — only <b>Text</b> and <b>Stacks</b> are shown, and the Stacks view shows a single <b>Variables</b> panel (the current scope's variables, with <span class="command">IT</span> listed first) instead of the Data Stack + Memory pair. Because each step consumes one word or token rather than one character, the active-cell highlight in the editor spans the whole token being executed. Step, Run, Speed, Max Steps, the Input field, and syntax highlighting all work the same as on the other engines' pages.</p>
+    <p><a href="../../lolcode/">Open the lolcode IDE</a></p>
+  </section>
+</main><script src="../docs.js"></script>
+</body></html>

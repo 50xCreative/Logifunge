@@ -6,20 +6,20 @@
   <section>
     <h2>What is this?</h2>
     <p>This isn't a LOGIFUNGE dialect or an esolang at all — it's plain <a href="https://www.python.org/">Python 3</a>, running via <a href="https://pyodide.org/">Pyodide</a>, a build of CPython compiled to WebAssembly. It's included so the same editor and IDE chrome used for the esoteric languages can also double as an install-free Python scratchpad. Code you write here runs as real, unmodified Python — there's no custom grammar or instruction set to learn.</p>
-    <p>Because a Python program executes as one opaque unit rather than one instruction at a time, this engine plugs into the shared IDE differently from v1-v6, brainfrick, and malbolge: there's no step debugger, no adjustable playback speed, and no 2D instruction pointer. See "Using the IDE with Python" below for exactly what's shown and hidden here.</p>
+    <p>It plugs into the shared IDE the same way the lolcode engine does: you can <b>Step</b> through it one line at a time, watch the current scope's variables in the Stacks view, and see the line about to run highlighted in the editor. See "Stepping and variables" and "Using the IDE with Python" below for how that works.</p>
   </section>
 
   <section>
     <h2>Output</h2>
-    <p>Anything written with <span class="command">print()</span>, or anything sent to <span class="command">sys.stderr</span> (including uncaught exception tracebacks), appears in the Text output view once the program finishes running.</p>
+    <p>Anything written with <span class="command">print()</span>, or anything sent to <span class="command">sys.stderr</span>, appears in the Text output view in the order it happened. When you Step, the output grows one line of your program at a time.</p>
     <pre>print("Hello, World!")
 output: Hello, World!</pre>
-    <p>An unhandled exception doesn't stop the IDE — it prints a normal Python traceback to the output, the same as it would in a terminal, and the status bar shows the error.</p>
+    <p>An unhandled exception doesn't stop the IDE — it prints a normal Python traceback (your own lines only) at the end of the output, the same as it would in a terminal, and the status bar shows the error.</p>
   </section>
 
   <section>
     <h2>Input</h2>
-    <p>The IDE's top bar shows an <b>Input</b> field for this engine. Whatever you type there is split into lines before the program runs, and each call to <span class="command">input()</span> pops the next line off the front of it. Once the field's lines are exhausted, a further <span class="command">input()</span> call raises the normal <span class="command">EOFError</span> — the same thing that happens when a real program's stdin runs dry.</p>
+    <p>The IDE's top bar shows an <b>Input</b> field for this engine. Whatever you type there is split into lines before the program starts, and each call to <span class="command">input()</span> pops the next line off the front of it. Once the field's lines are exhausted, a further <span class="command">input()</span> call raises the normal <span class="command">EOFError</span> — the same thing that happens when a real program's stdin runs dry.</p>
     <pre>name = input("name: ")
 print(f"hello, {name}!")</pre>
     <p>Note that any prompt text passed to <span class="command">input()</span> is not itself written to the output here, since there's nowhere for it to appear before the field is read — type your answer into Input ahead of time rather than waiting for a prompt to show up.</p>
@@ -32,12 +32,24 @@ print(f"hello, {name}!")</pre>
 
   <section>
     <h2>Loading time</h2>
-    <p>The first time you press Run on this page, your browser downloads the Pyodide runtime (roughly 10&nbsp;MB) before your code executes — the status bar shows a loading message while this happens. Your browser caches it afterward, so every run after the first is fast for the rest of the session.</p>
+    <p>The first time you press Run or Step on this page, your browser downloads the Pyodide runtime (roughly 10&nbsp;MB) before your code executes — the status bar shows a loading message while this happens. The runtime is hosted on this site itself (under <span class="command">/pyodide/</span>), not fetched from a third-party CDN; a CDN copy is only used as a fallback if the local files can't be loaded. Your browser caches it afterward, so every run after the first is fast.</p>
+  </section>
+
+  <section>
+    <h2>Stepping and variables</h2>
+    <p>Each <b>Step</b> advances the program by one line of your code, and the editor highlights the whole line that is <i>about to</i> run, the way a debugger like <span class="command">pdb</span> does — so a line's effect shows up on the step after it. The <b>Variables</b> panel lists the current scope as <span class="command">name: value</span>: the global variables at module level, or that call's local variables (under an <span class="command">in fname()</span> heading) while inside a function. Modules, functions, and classes are left out, and long values are abbreviated.</p>
+    <pre>total = 0
+for n in range(3):
+    total += n
+print(total)</pre>
+    <p>Only the lines you typed are stepped. A call into the standard library or another module counts as part of the line that made it.</p>
+    <p>If you don't want any of that, choose <b>Instant</b> in the Speed menu. Instant runs the program straight through at full CPython speed with no stepping and no Max Steps limit, then shows the final output and the final variables. It behaves like a normal Python runtime: <span class="command">input()</span> still reads from the Input field, and top-level <span class="command">await</span> works. The trade-off is that an infinite loop will freeze the tab, and Run can't be stopped once it starts.</p>
+    <p>Under the hood, the first time you press Run or Step the program is executed once, start to finish, while every line and its variables are recorded; Step and Run then replay that recording. Two things follow from this: <span class="command">input()</span> reads from the Input field up front instead of waiting for you, and the program can't be paused partway — an infinite loop simply stops at the <b>Max Steps</b> limit with a "Step limit reached" error. Each run starts with a fresh namespace, so variables never carry over from one run to the next.</p>
   </section>
 
   <section>
     <h2>Using the IDE with Python</h2>
-    <p>Because Python here runs as one async unit rather than one instruction per step, several controls the other engines use don't apply and are hidden on this page: <b>Step</b>, the <b>Speed</b> and <b>Max Steps</b> controls, the direction indicator, and the Pixel/Dual output views. <b>Run</b>, <b>Clear Output</b>, the Input field, and syntax highlighting all work as usual. The Stacks view is still present but has nothing engine-specific to show, since Python's runtime state lives inside the wasm heap rather than in a shape this IDE can inspect.</p>
+    <p>The IDE is the same one the other engines use, with a couple of things tailored for Python: the Pixel and Dual output views are hidden, since Python has no pixel output here — only <b>Text</b> and <b>Stacks</b> are shown, and the Stacks view shows a single <b>Variables</b> panel instead of the Data Stack + Memory pair. Because each step covers one line, the active-cell highlight spans the whole line being executed. Step, Run, Speed, Max Steps, the Input field, and syntax highlighting all work the same as on the other engines' pages, including Turbo mode. Python's Speed menu has one extra entry, <b>Instant</b>, described above.</p>
     <p><a href="../../python/">Open the Python IDE</a></p>
   </section>
 </main><script src="../docs.js"></script>

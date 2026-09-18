@@ -1,9 +1,9 @@
 // Cloudflare Pages Function: matches any single top-level path segment,
 // e.g. GET /v1, /v2, ... /v6, /vbrainfrick, /brainfrick, /vmalbolge,
-// /malbolge, /vpython, /python — and passes through to static assets / 404
-// for anything else (this file only intercepts segments matching the
-// vN / v<alias> / <alias> pattern; everything else is left to Pages'
-// normal static asset resolution).
+// /malbolge, /vpython, /python, /vlolcode, /lolcode — and passes through
+// to static assets / 404 for anything else (this file only intercepts
+// segments matching the vN / v<alias> / <alias> pattern; everything else
+// is left to Pages' normal static asset resolution).
 //
 // Serves ONE shared run page (the template in ./_run-template.js) for
 // every version, swapping in only what varies per version: the
@@ -18,8 +18,8 @@ import { RUN_HTML_TEMPLATE } from './_run-template.js';
 // or bare "<alias>" (e.g. /brainfrick) — each alias here must match a
 // version accepted by functions/interpreter.js and have a corresponding
 // interpreters/interpreter_v<alias>.js file.
-const VERSION_PATTERN = /^v([1-6]|brainfrick|malbolge|python)$/i;
-const NAMED_ALIAS_PATTERN = /^(brainfrick|malbolge|python)$/i;
+const VERSION_PATTERN = /^v([1-6]|brainfrick|malbolge|python|lolcode)$/i;
+const NAMED_ALIAS_PATTERN = /^(brainfrick|malbolge|python|lolcode)$/i;
 
 export async function onRequestGet(context) {
   const { params } = context;
@@ -34,7 +34,7 @@ export async function onRequestGet(context) {
   }
 
   const num = match[1].toLowerCase();
-  const versionSlug = (num === 'brainfrick' || num === 'malbolge' || num === 'python') ? num : `v${num}`;
+  const versionSlug = (num === 'brainfrick' || num === 'malbolge' || num === 'python' || num === 'lolcode') ? num : `v${num}`;
 
   const html = RUN_HTML_TEMPLATE
     .replaceAll('__VERSION_NUM__', num)

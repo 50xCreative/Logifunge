@@ -59,6 +59,7 @@ export const RUN_HTML_TEMPLATE = `<!DOCTYPE html>
   <script src="/shared/mode-logifunge.js"></script>
   <script src="/shared/mode-brainfrick.js"></script>
   <script src="/shared/mode-malbolge.js"></script>
+  <script src="/shared/mode-lolcode.js"></script>
 </head>
 <body>
 
@@ -218,11 +219,8 @@ const stackSearchStatus = document.getElementById('stack-search-status');
 const btnHighlight = document.getElementById('btn-toggle-highlight');
 const inputWrap = document.getElementById('input-wrap');
 const stdinInput = document.getElementById('stdin-input');
-const speedWrap = document.getElementById('speed-wrap');
-const dirWrap = document.getElementById('dir-wrap');
-const maxWrap = document.getElementById('max-wrap');
 let isHighlightingOn = false;
-let asyncRunBusy = false;
+let engineBusy = false; // true while an engine's async prepare() or instant run is in flight
 
 // Which engine this page is serving — substituted per-version by the
 // server (functions/[version].js), e.g. '1'..'6', 'brainfrick', 'malbolge'.
@@ -234,11 +232,14 @@ const LANG_VERSION = '__VERSION_NUM__';
 // get their own, since their grammars have nothing in common with it.
 // Python uses Ace's own bundled mode (loaded from cdnjs above) rather than
 // a hand-rolled one, since it's plain, standard Python — no custom grammar
-// needed the way the esolangs have.
+// needed the way the esolangs have. LOLCODE gets its own hand-rolled mode
+// too (shared/mode-lolcode.js), since its multi-word vocabulary has
+// nothing in common with any of the others.
 function aceModeForVersion(v) {
   if (v === 'malbolge') return 'ace/mode/malbolge';
   if (v === 'brainfrick') return 'ace/mode/brainfrick';
   if (v === 'python') return 'ace/mode/python';
+  if (v === 'lolcode') return 'ace/mode/lolcode';
   return 'ace/mode/logifunge';
 }
 
@@ -252,25 +253,20 @@ const engineFeatures = (typeof BefungeLogicInterpreter !== 'undefined' && Array.
   : [];
 const hasInputFeature = engineFeatures.includes('input');
 const hasPixelsFeature = engineFeatures.length === 0 || engineFeatures.includes('pixels');
-// Engines that execute as one opaque async unit (currently just Python, via
-// Pyodide) rather than one instruction per _step() call — see runAsyncEngine()
-// below and interpreters/interpreter_vpython.js for why this exists.
-const isAsyncEngine = engineFeatures.includes('async');
-
+// 'instant' engines (currently Python) can also run start-to-finish in one
+// go, with no stepping, via runInstant() — offered as an extra Speed option.
+const hasInstantFeature = engineFeatures.includes('instant');
 if (hasInputFeature) inputWrap.hidden = false;
+if (hasInstantFeature) {
+  const instantOption = document.createElement('option');
+  instantOption.value = 'instant';
+  instantOption.textContent = 'Instant';
+  speedSelect.appendChild(instantOption);
+}
 if (!hasPixelsFeature) {
   modeBtnPixel.hidden = true;
   modeBtnBoth.hidden = true;
   dimWrap.hidden = true;
-}
-if (isAsyncEngine) {
-  // None of these apply to a program that runs as a single async unit:
-  // there's no per-instruction stepping, no adjustable playback speed or
-  // step cap, and no 2D instruction pointer to show a direction for.
-  btnStep.hidden = true;
-  speedWrap.hidden = true;
-  maxWrap.hidden = true;
-  dirWrap.hidden = true;
 }
 
 // ── STACK PANELS ──────────────────────────────────────────────
@@ -490,11 +486,17 @@ function clearActiveCellHighlight() {
 function highlightActiveCell(interp) {
   clearActiveCellHighlight();
   if (!interp || !interp.ip) return;
-  const { x, y } = interp.ip;
+  const { x, y, endX } = interp.ip;
   if (y < 0 || x < 0) return;
   const row = Math.max(0, y);
   const col = Math.max(0, x);
-  const range = new ace.Range(row, col, row, Math.min(aceEditor.session.getLine(row).length, col + 1));
+  // Most engines highlight a single character; token-based engines (e.g.
+  // LOLCODE, see interpreters/interpreter_vlolcode.js) set ip.endX so the
+  // whole word/token being executed is highlighted instead of just its
+  // first character. Falls back to the old 1-char span when absent.
+  const lineLen = aceEditor.session.getLine(row).length;
+  const endCol = Math.min(lineLen, typeof endX === 'number' ? Math.max(endX, col + 1) : col + 1);
+  const range = new ace.Range(row, col, row, endCol);
   activeCellMarker = aceEditor.session.addMarker(range, 'ace_active-cell', 'text', false);
   aceEditor.moveCursorTo(row, col);
   aceEditor.clearSelection();
@@ -608,10 +610,11 @@ function getTurboWorker() {
   if (turboWorker) return turboWorker;
   const workerSrc = \`
     importScripts(\${JSON.stringify(new URL('/interpreter?v=__VERSION_NUM__', location.origin).href)});
-    self.onmessage = function(e) {
+    self.onmessage = async function(e) {
       const { code, w, h, maxSteps, stdin } = e.data;
       const interp = new BefungeLogicInterpreter(code, w, h, maxSteps);
       if (stdin !== undefined) interp.stdin = stdin;
+      if (typeof interp.prepare === 'function') await interp.prepare();
       const result = interp.run();
       const pixelBuf = new Uint32Array(result.pixels.length * 3);
       for (let i = 0; i < result.pixels.length; i++) {
@@ -637,13 +640,13 @@ function getTurboWorker() {
 
 function isHighSpeed() {
   const v = speedSelect.value;
-  return v === 'max' || v === 'turbo' || parseInt(v, 10) >= 25;
+  return v === 'max' || v === 'turbo' || v === 'instant' || parseInt(v, 10) >= 25;
 }
 
 // ── RUN ───────────────────────────────────────────────────────
 function getStepDelayMs() {
   const value = speedSelect.value;
-  if (value === 'max' || value === 'turbo') return 0;
+  if (value === 'max' || value === 'turbo' || value === 'instant') return 0;
   return Math.max(0, 1000 / parseInt(value, 10));
 }
 
@@ -685,49 +688,72 @@ function updateDisplay(interp, w, h) {
   }
 }
 
-// ── ASYNC RUN (Python/Pyodide-style engines) ────────────────────
-// Pyodide execution — including the one-time runtime download — is
-// inherently a Promise, unlike every other engine's synchronous _step().
-// This mirrors run()'s job (validate, execute, render, report status) but
-// awaits interp.runAsync() once instead of driving a step loop, and has
-// no Stop/Turbo/speed concepts to manage.
-async function runAsyncEngine() {
-  if (asyncRunBusy) return; // a run is already in flight; Run is disabled meanwhile anyway
-  const code = aceEditor.getValue();
-  if (!code.trim()) { setStatus('No Code'); return; }
-
-  asyncRunBusy = true;
+// ── ENGINE PREPARE (Python/Pyodide) ─────────────────────────────
+// Most engines are ready to step the moment they're constructed. Python
+// (interpreters/interpreter_vpython.js) first has to load Pyodide and record
+// one traced run of the program, which is inherently async, so it exposes an
+// optional async prepare(). Every path that steps an engine — Run, Step, and
+// the Turbo worker — awaits it first when it exists; engines without one
+// skip straight through, unchanged. Resolves true when the engine is ready
+// to step, false if prepare() failed (the reason is left in interp.error).
+async function prepareEngine(interp) {
+  if (typeof interp.prepare !== 'function') return true;
+  engineBusy = true;
   btnRun.disabled = true;
+  btnStep.disabled = true;
+  interp.onStatus = msg => setStatus(msg);
+  try {
+    await interp.prepare();
+  } finally {
+    engineBusy = false;
+    btnRun.disabled = false;
+    btnStep.disabled = false;
+  }
+  return !interp.error;
+}
+
+// ── INSTANT RUN (engines with the 'instant' feature) ────────────
+// The "Instant" speed: no stepping, no step cap, no highlight — just run
+// the whole program and show the final output and variables. The engine's
+// runInstant() is a Promise (Python loads Pyodide on first use), and it
+// can't be interrupted, so Run is disabled until it finishes.
+async function runInstantEngine(code) {
+  engineBusy = true;
+  btnRun.disabled = true;
+  btnStep.disabled = true;
   btnRun.classList.add('running');
   btnRun.textContent = '■ Running';
   setStatus('Starting…');
+  stepInterp = null; // a later Step starts a fresh stepped run
 
-  const interp = new BefungeLogicInterpreter(code);
+  const interp = new BefungeLogicInterpreter(code, 32, 32, getMaxSteps());
   if (hasInputFeature) interp.stdin = stdinInput.value;
   interp.onStatus = msg => setStatus(msg);
   runInterp = interp;
 
   try {
-    const result = await interp.runAsync();
+    const result = await interp.runInstant();
     const text = (result.textOutput || '').trimEnd();
     textContent.textContent = text || '— no text output (use print()) —';
-    textContent.style.color = text ? '#0f8' : '#444';
+    if (outputMode === 'text' || outputMode === 'both') textContent.style.color = text ? '#0f8' : '#444';
+    clearActiveCellHighlight();
     showStackBar(result);
     showStacks(result);
     if (result.error) setStatus(\`⚠ \${result.error}\`, 'err');
-    else setStatus('Done', 'ok');
+    else setStatus('Done — instant run', 'ok');
   } catch (e) {
     setStatus('Error: ' + e.message, 'err');
   } finally {
-    asyncRunBusy = false;
+    engineBusy = false;
     btnRun.disabled = false;
+    btnStep.disabled = false;
     btnRun.classList.remove('running');
     btnRun.textContent = '▶ Run';
   }
 }
 
 function run() {
-  if (isAsyncEngine) { runAsyncEngine(); return; }
+  if (engineBusy) return; // an engine is still loading/preparing; Run/Step are disabled meanwhile anyway
   if (runTimer || turboWorkerBusy) {
     stopAutoRun(true);
     setStatus('Run Stopped');
@@ -739,6 +765,8 @@ function run() {
   const execCode = code;
   const w = Math.max(1, Math.min(256, parseInt(inpW.value) || 32));
   const h = Math.max(1, Math.min(256, parseInt(inpH.value) || 32));
+
+  if (speedSelect.value === 'instant' && hasInstantFeature) { runInstantEngine(code); return; }
 
   setStatus('Running…');
   btnRun.classList.add('running');
@@ -785,6 +813,7 @@ function run() {
   runInterp.running = true;
   updateDisplay(runInterp, w, h);
 
+  const interp = runInterp;
   const tick = () => {
     if (!runInterp || !runInterp.running) { stopAutoRun(); return; }
     try {
@@ -825,12 +854,26 @@ function run() {
       stopAutoRun();
     }
   };
+  if (typeof interp.prepare === 'function') {
+    setStatus('Starting…');
+    prepareEngine(interp).then(ok => {
+      if (runInterp !== interp) return; // superseded by another run while preparing
+      if (!ok) {
+        updateDisplay(interp, w, h);
+        setStatus(\`⚠ \${interp.error}\`, 'err');
+        stopAutoRun();
+        return;
+      }
+      tick();
+    });
+    return;
+  }
   tick();
 }
 
 // ── STEP ──────────────────────────────────────────────────────
-function stepOnce() {
-  if (isAsyncEngine) { setStatus('Step is not available for Python — use Run', 'err'); return; }
+async function stepOnce() {
+  if (engineBusy) return;
   const code = aceEditor.getValue();
   if (!code.trim()) { setStatus('No Code'); return; }
   stepW = Math.max(1, Math.min(256, parseInt(inpW.value) || 32));
@@ -845,6 +888,16 @@ function stepOnce() {
     stepInterp.running = true;
     setupCanvas(stepW, stepH);
     setStatus('Step Mode');
+    if (typeof stepInterp.prepare === 'function') {
+      const interp = stepInterp;
+      const ok = await prepareEngine(interp);
+      if (!ok) {
+        setStatus(\`⚠ \${interp.error}\`, 'err');
+        stepInterp = null;
+        return;
+      }
+      setStatus('Step Mode');
+    }
   }
   if (!stepInterp.running) { setStatus('Done', 'ok'); return; }
   const cont = stepInterp._step();
@@ -852,7 +905,11 @@ function stepOnce() {
   updateDisplay(stepInterp, stepW, stepH);
   highlightActiveCell(stepInterp);
   setStatus(\`Step \${stepInterp.steps} — IP(\${stepInterp.ip.x},\${stepInterp.ip.y})\`);
-  if (!cont || !stepInterp.running) { setStatus(\`Done — \${stepInterp.steps} steps\`, 'ok'); stepInterp = null; }
+  if (!cont || !stepInterp.running) {
+    if (stepInterp.error) setStatus(\`⚠ \${stepInterp.error}\`, 'err');
+    else setStatus(\`Done — \${stepInterp.steps} steps\`, 'ok');
+    stepInterp = null;
+  }
 }
 
 // ── CLEAR OUTPUT ─────────────────────────────────────────────

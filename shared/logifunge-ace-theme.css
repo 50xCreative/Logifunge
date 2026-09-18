@@ -208,3 +208,122 @@
   color: #ff3860;
   background: rgba(255, 56, 96, 0.15);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   LOLCODE syntax colors for Ace
+   LOLCODE's vocabulary is multi-character words rather than single
+   opcodes, so colors are grouped by role (declaration, conditional,
+   loop, function, logic, math, I/O, ...) — see the comment at the
+   top of shared/mode-lolcode.js for the full grouping.
+   ══════════════════════════════════════════════════════════════ */
+
+/* HAI / KTHXBYE — program start/end — red-orange, matches LOGIFUNGE's
+   control-flow/halt family */
+.ace_keyword.ace_other.ace_program.ace_lolcode {
+  color: #ff6b6b;
+  font-weight: bold;
+}
+
+/* I HAS A / ITZ / R / IS NOW A / AN — declaration, assignment, cast —
+   violet, matches LOGIFUNGE's memory family */
+.ace_variable.ace_parameter.ace_decl.ace_lolcode {
+  color: #b48ead;
+}
+
+/* O RLY? / YA RLY / MEBBE / NO WAI / OIC — conditionals — pink,
+   matches LOGIFUNGE's conditional-redirect family */
+.ace_keyword.ace_control.ace_conditional.ace_lolcode {
+  color: #ff8fd6;
+  font-weight: bold;
+}
+
+/* WTF? / OMG / OMGWTF — switch — magenta, close cousin of the
+   conditional family but visually distinct from O RLY?/OIC */
+.ace_keyword.ace_control.ace_switch.ace_lolcode {
+  color: #d68fff;
+  font-weight: bold;
+}
+
+/* IM IN YR / UPPIN / NERFIN / TIL / WILE / IM OUTTA YR — loops —
+   yellow-green, matches LOGIFUNGE's loop family */
+.ace_keyword.ace_control.ace_loop.ace_lolcode {
+  color: #b5e061;
+  font-weight: bold;
+}
+
+/* HOW IZ I / IF U SAY SO / FOUND YR / GTFO — functions and flow
+   control — blue, matches LOGIFUNGE's subroutine family */
+.ace_keyword.ace_control.ace_function.ace_lolcode {
+  color: #6ab0f3;
+  font-weight: bold;
+}
+
+/* BOTH SAEM / BOTH OF / EITHER OF / WON OF / NOT / ALL OF / ANY OF /
+   DIFFRINT / MKAY — boolean & comparison operators — cyan, matches
+   LOGIFUNGE's logic-gate family */
+.ace_keyword.ace_operator.ace_logic.ace_lolcode {
+  color: #5ce1e6;
+  font-weight: bold;
+}
+
+/* SUM OF / DIFF OF / PRODUKT OF / QUOSHUNT OF / MOD OF / BIGGR OF /
+   SMALLR OF / OF — math operators — muted blue-gray, matches
+   LOGIFUNGE's stack/math family */
+.ace_keyword.ace_operator.ace_math.ace_lolcode {
+  color: #7a9cc6;
+}
+
+/* SMOOSH / MAEK — string concatenation and casting — teal */
+.ace_support.ace_function.ace_cast.ace_lolcode {
+  color: #3fb8af;
+}
+
+/* NUMBR / NUMBAR / YARN / TROOF / NOOB — type names — dim violet-gray,
+   close to the decl family since types show up in casts/declarations */
+.ace_support.ace_type.ace_lolcode {
+  color: #8f8fae;
+}
+
+/* WIN / FAIL / IT — literal constants and the IT pronoun — gold,
+   matches LOGIFUNGE's numeric-literal family */
+.ace_constant.ace_language.ace_lolcode {
+  color: #ffcc66;
+}
+
+/* VISIBLE / GIMMEH — I/O — green, matches the site's text-output color */
+.ace_support.ace_function.ace_io.ace_lolcode {
+  color: #33ff99;
+  font-weight: bold;
+}
+
+/* Numeric literals */
+.ace_constant.ace_numeric.ace_lolcode {
+  color: #ffcc66;
+}
+
+/* String literals — standard string green-yellow, italic */
+.ace_string.ace_lolcode {
+  color: #d4d47a;
+  font-style: italic;
+}
+
+/* BTW / OBTW..TLDR comments — dim italic gray, matches every other
+   engine's comment convention */
+.ace_comment.ace_line.ace_lolcode,
+.ace_comment.ace_block.ace_lolcode {
+  color: #fff;
+  font-style: italic;
+}
+
+/* ? ! , punctuation — dim gray so it doesn't compete with keywords */
+.ace_punctuation.ace_lolcode {
+  color: #666;
+}
+
+/* Bare identifiers (variable/function names) — bright white with
+   underline, matches LOGIFUNGE's label-name convention */
+.ace_entity.ace_name.ace_variable.ace_lolcode {
+  color: #f5f5f5;
+  text-decoration: underline;
+  text-decoration-color: #444;
+}
