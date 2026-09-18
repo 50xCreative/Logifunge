@@ -55,6 +55,7 @@ export const RUN_HTML_TEMPLATE = `<!DOCTYPE html>
   <link rel="stylesheet" href="/shared/style.css" />
   <link rel="stylesheet" href="/shared/logifunge-ace-theme.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/mode-python.min.js"></script>
   <script src="/shared/mode-logifunge.js"></script>
   <script src="/shared/mode-brainfrick.js"></script>
   <script src="/shared/mode-malbolge.js"></script>
@@ -217,7 +218,11 @@ const stackSearchStatus = document.getElementById('stack-search-status');
 const btnHighlight = document.getElementById('btn-toggle-highlight');
 const inputWrap = document.getElementById('input-wrap');
 const stdinInput = document.getElementById('stdin-input');
+const speedWrap = document.getElementById('speed-wrap');
+const dirWrap = document.getElementById('dir-wrap');
+const maxWrap = document.getElementById('max-wrap');
 let isHighlightingOn = false;
+let asyncRunBusy = false;
 
 // Which engine this page is serving — substituted per-version by the
 // server (functions/[version].js), e.g. '1'..'6', 'brainfrick', 'malbolge'.
@@ -227,9 +232,13 @@ const LANG_VERSION = '__VERSION_NUM__';
 // LOGIFUNGE and all its numbered versions share one highlighter,
 // since they're the same core ISA; brainfrick and malbolge each
 // get their own, since their grammars have nothing in common with it.
+// Python uses Ace's own bundled mode (loaded from cdnjs above) rather than
+// a hand-rolled one, since it's plain, standard Python — no custom grammar
+// needed the way the esolangs have.
 function aceModeForVersion(v) {
   if (v === 'malbolge') return 'ace/mode/malbolge';
   if (v === 'brainfrick') return 'ace/mode/brainfrick';
+  if (v === 'python') return 'ace/mode/python';
   return 'ace/mode/logifunge';
 }
 
@@ -243,12 +252,25 @@ const engineFeatures = (typeof BefungeLogicInterpreter !== 'undefined' && Array.
   : [];
 const hasInputFeature = engineFeatures.includes('input');
 const hasPixelsFeature = engineFeatures.length === 0 || engineFeatures.includes('pixels');
+// Engines that execute as one opaque async unit (currently just Python, via
+// Pyodide) rather than one instruction per _step() call — see runAsyncEngine()
+// below and interpreters/interpreter_vpython.js for why this exists.
+const isAsyncEngine = engineFeatures.includes('async');
 
 if (hasInputFeature) inputWrap.hidden = false;
 if (!hasPixelsFeature) {
   modeBtnPixel.hidden = true;
   modeBtnBoth.hidden = true;
   dimWrap.hidden = true;
+}
+if (isAsyncEngine) {
+  // None of these apply to a program that runs as a single async unit:
+  // there's no per-instruction stepping, no adjustable playback speed or
+  // step cap, and no 2D instruction pointer to show a direction for.
+  btnStep.hidden = true;
+  speedWrap.hidden = true;
+  maxWrap.hidden = true;
+  dirWrap.hidden = true;
 }
 
 // ── STACK PANELS ──────────────────────────────────────────────
@@ -663,7 +685,49 @@ function updateDisplay(interp, w, h) {
   }
 }
 
+// ── ASYNC RUN (Python/Pyodide-style engines) ────────────────────
+// Pyodide execution — including the one-time runtime download — is
+// inherently a Promise, unlike every other engine's synchronous _step().
+// This mirrors run()'s job (validate, execute, render, report status) but
+// awaits interp.runAsync() once instead of driving a step loop, and has
+// no Stop/Turbo/speed concepts to manage.
+async function runAsyncEngine() {
+  if (asyncRunBusy) return; // a run is already in flight; Run is disabled meanwhile anyway
+  const code = aceEditor.getValue();
+  if (!code.trim()) { setStatus('No Code'); return; }
+
+  asyncRunBusy = true;
+  btnRun.disabled = true;
+  btnRun.classList.add('running');
+  btnRun.textContent = '■ Running';
+  setStatus('Starting…');
+
+  const interp = new BefungeLogicInterpreter(code);
+  if (hasInputFeature) interp.stdin = stdinInput.value;
+  interp.onStatus = msg => setStatus(msg);
+  runInterp = interp;
+
+  try {
+    const result = await interp.runAsync();
+    const text = (result.textOutput || '').trimEnd();
+    textContent.textContent = text || '— no text output (use print()) —';
+    textContent.style.color = text ? '#0f8' : '#444';
+    showStackBar(result);
+    showStacks(result);
+    if (result.error) setStatus(\`⚠ \${result.error}\`, 'err');
+    else setStatus('Done', 'ok');
+  } catch (e) {
+    setStatus('Error: ' + e.message, 'err');
+  } finally {
+    asyncRunBusy = false;
+    btnRun.disabled = false;
+    btnRun.classList.remove('running');
+    btnRun.textContent = '▶ Run';
+  }
+}
+
 function run() {
+  if (isAsyncEngine) { runAsyncEngine(); return; }
   if (runTimer || turboWorkerBusy) {
     stopAutoRun(true);
     setStatus('Run Stopped');
@@ -766,6 +830,7 @@ function run() {
 
 // ── STEP ──────────────────────────────────────────────────────
 function stepOnce() {
+  if (isAsyncEngine) { setStatus('Step is not available for Python — use Run', 'err'); return; }
   const code = aceEditor.getValue();
   if (!code.trim()) { setStatus('No Code'); return; }
   stepW = Math.max(1, Math.min(256, parseInt(inpW.value) || 32));
