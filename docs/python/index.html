@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>LOGIFUNGE python Documentation</title><link rel="stylesheet" href="../docs.css"></head>
+<body data-version="python">
+<main>
+  <section>
+    <h2>What is this?</h2>
+    <p>This isn't a LOGIFUNGE dialect or an esolang at all — it's plain <a href="https://www.python.org/">Python 3</a>, running via <a href="https://pyodide.org/">Pyodide</a>, a build of CPython compiled to WebAssembly. It's included so the same editor and IDE chrome used for the esoteric languages can also double as an install-free Python scratchpad. Code you write here runs as real, unmodified Python — there's no custom grammar or instruction set to learn.</p>
+    <p>Because a Python program executes as one opaque unit rather than one instruction at a time, this engine plugs into the shared IDE differently from v1-v6, brainfrick, and malbolge: there's no step debugger, no adjustable playback speed, and no 2D instruction pointer. See "Using the IDE with Python" below for exactly what's shown and hidden here.</p>
+  </section>
+
+  <section>
+    <h2>Output</h2>
+    <p>Anything written with <span class="command">print()</span>, or anything sent to <span class="command">sys.stderr</span> (including uncaught exception tracebacks), appears in the Text output view once the program finishes running.</p>
+    <pre>print("Hello, World!")
+output: Hello, World!</pre>
+    <p>An unhandled exception doesn't stop the IDE — it prints a normal Python traceback to the output, the same as it would in a terminal, and the status bar shows the error.</p>
+  </section>
+
+  <section>
+    <h2>Input</h2>
+    <p>The IDE's top bar shows an <b>Input</b> field for this engine. Whatever you type there is split into lines before the program runs, and each call to <span class="command">input()</span> pops the next line off the front of it. Once the field's lines are exhausted, a further <span class="command">input()</span> call raises the normal <span class="command">EOFError</span> — the same thing that happens when a real program's stdin runs dry.</p>
+    <pre>name = input("name: ")
+print(f"hello, {name}!")</pre>
+    <p>Note that any prompt text passed to <span class="command">input()</span> is not itself written to the output here, since there's nowhere for it to appear before the field is read — type your answer into Input ahead of time rather than waiting for a prompt to show up.</p>
+  </section>
+
+  <section>
+    <h2>What's available</h2>
+    <p>The Python standard library ships with Pyodide and works normally — <span class="command">math</span>, <span class="command">json</span>, <span class="command">re</span>, <span class="command">itertools</span>, and so on all import without any setup. Third-party packages are more limited: only pure-Python packages (and a handful of packages Pyodide ships precompiled to wasm) can be imported, and there's no network access or <span class="command">pip install</span> from inside a running program — anything that needs to install a package or reach the network at runtime won't work here.</p>
+  </section>
+
+  <section>
+    <h2>Loading time</h2>
+    <p>The first time you press Run on this page, your browser downloads the Pyodide runtime (roughly 10&nbsp;MB) before your code executes — the status bar shows a loading message while this happens. Your browser caches it afterward, so every run after the first is fast for the rest of the session.</p>
+  </section>
+
+  <section>
+    <h2>Using the IDE with Python</h2>
+    <p>Because Python here runs as one async unit rather than one instruction per step, several controls the other engines use don't apply and are hidden on this page: <b>Step</b>, the <b>Speed</b> and <b>Max Steps</b> controls, the direction indicator, and the Pixel/Dual output views. <b>Run</b>, <b>Clear Output</b>, the Input field, and syntax highlighting all work as usual. The Stacks view is still present but has nothing engine-specific to show, since Python's runtime state lives inside the wasm heap rather than in a shape this IDE can inspect.</p>
+    <p><a href="../../python/">Open the Python IDE</a></p>
+  </section>
+</main><script src="../docs.js"></script>
+</body></html>
