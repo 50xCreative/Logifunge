@@ -244,6 +244,10 @@ function tokenize(code) {
   return tokens;
 }
 
+// Yielded by *_readInputLine() when GIMMEH has to wait for the user; _step()
+// recognises it and holds position instead of counting a step.
+const INPUT_WAIT = { inputWait: true };
+
 class BefungeLogicInterpreter {
   // No 'pixels' (LOLCODE has no pixel output here). No 'async' — this
   // engine steps one token at a time, same interactive-debugger shape
@@ -279,6 +283,9 @@ class BefungeLogicInterpreter {
     this.stdin = '';
     this._stdinLines = null;
     this._stdinPos = 0;
+    this.interactive = false;  // true = pause for terminal input instead of returning ''
+    this._stdinClosed = false; // set by provideEOF() (Ctrl+D in the terminal)
+    this.awaitingInput = null; // { kind: 'line' } while paused waiting for the user to type
     this.running = false;
     this.steps = 0;
     this.maxSteps = maxSteps;
@@ -687,7 +694,8 @@ class BefungeLogicInterpreter {
         yield* this._skipTrivia();
         const name = this._cur().value;
         yield* this._advance();
-        this._set(name, YARN(this._readInputLine()));
+        const line = yield* this._readInputLine();
+        this._set(name, YARN(line));
         yield* this._consumeSep();
         return;
       }
@@ -899,10 +907,35 @@ class BefungeLogicInterpreter {
     yield* this._consumeSep();
   }
 
-  _readInputLine() {
-    if (this._stdinLines === null) this._stdinLines = (this.stdin || '').split('\n');
-    if (this._stdinPos < this._stdinLines.length) return this._stdinLines[this._stdinPos++];
-    return '';
+  _initStdin() {
+    if (this._stdinLines === null) this._stdinLines = this.stdin ? this.stdin.split('\n') : [];
+  }
+
+  // GIMMEH: hands back the next queued line. In interactive mode, an empty
+  // queue pauses the whole generator (yield INPUT_WAIT) until the IDE calls
+  // provideInput()/provideEOF() and steps again.
+  *_readInputLine() {
+    this._initStdin();
+    while (this._stdinPos >= this._stdinLines.length) {
+      if (!this.interactive || this._stdinClosed) return '';
+      this.awaitingInput = { kind: 'line' };
+      yield INPUT_WAIT;
+    }
+    return this._stdinLines[this._stdinPos++];
+  }
+
+  // Terminal input: the typed line is queued for GIMMEH and echoed into the output.
+  provideInput(text) {
+    this._initStdin();
+    this._stdinLines.push(String(text));
+    this.output += String(text) + '\n';
+    this.awaitingInput = null;
+  }
+
+  // Ctrl+D in the terminal: further GIMMEH calls read an empty string.
+  provideEOF() {
+    this._stdinClosed = true;
+    this.awaitingInput = null;
   }
 
   *_run() {
@@ -923,6 +956,7 @@ class BefungeLogicInterpreter {
     try {
       const r = this._gen.next();
       if (r.done) { this.running = false; return false; }
+      if (r.value === INPUT_WAIT) return true; // waiting for terminal input — hold position
       const tok = r.value; // the token _advance() just consumed
       if (tok) this.ip = { x: tok.col, y: tok.row, endX: tok.endCol };
       this._syncVars();
@@ -936,10 +970,13 @@ class BefungeLogicInterpreter {
 
   run() {
     this.running = true;
-    this.steps = 0;
+    // run() can be resumed after the engine paused for terminal input, so
+    // only the first call resets the step counter.
+    if (!this._runStarted) { this._runStarted = true; this.steps = 0; }
     while (this.running && this.steps < this.maxSteps) {
       try {
         if (!this._step()) break;
+        if (this.awaitingInput) break; // paused for input — not a completed step
       } catch (err) {
         this.error = this._formatError(`Runtime error: ${err.message}`);
         this.running = false;
@@ -959,6 +996,7 @@ class BefungeLogicInterpreter {
       stack: [...this.stack],
       memory: { ...this.memory },
       memoryPointer: this.memoryPointer,
+      awaitingInput: this.awaitingInput,
     };
   }
 }

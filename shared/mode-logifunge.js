@@ -8,6 +8,7 @@
  *   logic gate  & | ~ @ N R X
  *   stack/math  0-9 : \ $ W + - * / l U A s m  and  [n] numeric literals
  *   memory      M S L
+ *   input       I
  *   output      . = , ' "  (and the string-mode contents of " ... ")
  *   control     _ ! g p %
  *   subroutine  D[name] C[name] r
@@ -86,8 +87,8 @@ var LogifungeHighlightRules = function() {
       // ── Memory ──
       { token: 'variable.parameter.memory.logifunge', regex: /[MSL]/ },
 
-      // ── Output ──
-      { token: 'constant.character.output.logifunge', regex: /[.=,']/ },
+      // ── Output (and I, input) ──
+      { token: 'constant.character.output.logifunge', regex: /[.=,'I]/ },
 
       // ── Control flow / end ──
       { token: 'keyword.control.flow.logifunge', regex: /[_!gp%]/ },

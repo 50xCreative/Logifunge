@@ -15,7 +15,7 @@
     <tr><td><span class="command">HAI</span></td><td>Opens the program. An optional version number (e.g. <span class="command">1.2</span>) may follow.</td></tr>
     <tr><td><span class="command">KTHXBYE</span></td><td>Ends the program.</td></tr>
     <tr><td><span class="command">VISIBLE</span> <i>expr</i> [<span class="command">AN</span> <i>expr</i> ...] [<span class="command">!</span>]</td><td>Prints the concatenation of every expression, followed by a newline — unless a trailing <span class="command">!</span> suppresses it.</td></tr>
-    <tr><td><span class="command">GIMMEH</span> <i>varname</i></td><td>Reads one line from Input into a variable. See Input below.</td></tr>
+    <tr><td><span class="command">GIMMEH</span> <i>varname</i></td><td>Reads one line from the terminal into a variable. See Input below.</td></tr>
     <tr><td><span class="command">I HAS A</span> <i>name</i> [<span class="command">ITZ</span> <i>expr</i>]</td><td>Declares a variable in the current scope, optionally with a starting value (defaults to <span class="command">NOOB</span>).</td></tr>
     <tr><td><i>name</i> <span class="command">R</span> <i>expr</i></td><td>Assigns to an already-declared variable.</td></tr>
     <tr><td><i>name</i> <span class="command">IS NOW A</span> <i>TYPE</i></td><td>Casts a variable's value to a new type in place.</td></tr>
@@ -63,7 +63,7 @@ output: 120</pre>
 
   <section>
     <h2>Input</h2>
-    <p>The IDE's top bar shows an <b>Input</b> field for this engine. Whatever you type there is split into lines before the program runs, and each <span class="command">GIMMEH</span> pops the next line off the front of it as a <span class="command">YARN</span> (string). Once the field's lines are exhausted, further <span class="command">GIMMEH</span> calls read an empty string.</p>
+    <p>Input works like a terminal. When the program reaches <span class="command">GIMMEH</span>, it pauses and a blinking cursor appears right after whatever it has printed so far (so <span class="command">VISIBLE "Name? " !</span> gives you a prompt on the same line). Type a line and press <b>Enter</b>: the line is echoed into the output and stored in the variable as a <span class="command">YARN</span> (string). Press <b>Ctrl+D</b> to end input &mdash; after that, further <span class="command">GIMMEH</span> calls read an empty string. Up/Down recall earlier lines.</p>
   </section>
 
   <section>
@@ -73,7 +73,7 @@ output: 120</pre>
 
   <section>
     <h2>Using the IDE with lolcode</h2>
-    <p>The IDE is the same one the other engines use, with a couple of things tailored for lolcode specifically: the Pixel and Dual output views are hidden, since LOLCODE has no pixel output — only <b>Text</b> and <b>Stacks</b> are shown, and the Stacks view shows a single <b>Variables</b> panel (the current scope's variables, with <span class="command">IT</span> listed first) instead of the Data Stack + Memory pair. Because each step consumes one word or token rather than one character, the active-cell highlight in the editor spans the whole token being executed. Step, Run, Speed, Max Steps, the Input field, and syntax highlighting all work the same as on the other engines' pages.</p>
+    <p>The IDE is the same one the other engines use, with a couple of things tailored for lolcode specifically: the Pixel and Dual output views are hidden, since LOLCODE has no pixel output — only <b>Text</b> and <b>Stacks</b> are shown, and the Stacks view shows a single <b>Variables</b> panel (the current scope's variables, with <span class="command">IT</span> listed first) instead of the Data Stack + Memory pair. Because each step consumes one word or token rather than one character, the active-cell highlight in the editor spans the whole token being executed. Step, Run, Speed, Max Steps, terminal input, and syntax highlighting all work the same as on the other engines' pages.</p>
     <p><a href="../../lolcode/">Open the lolcode IDE</a></p>
   </section>
 </main><script src="../docs.js"></script>

@@ -16,9 +16,9 @@ const examples = [
   {
     name: 'Echo Input',
     mode: 'text',
-    desc: "Read a character with , and print it with . in a loop until input runs out. Set the Input field (top bar) before running — Brainfuck's , reads from it one character at a time",
+    desc: "Read a character with , and print it with . in a loop until input ends. Type a line in the terminal when it pauses and press Enter, then Ctrl+D to end input",
     code: ',[.,]',
-    expectedOutput: { text: '(whatever you type into Input)' }
+    expectedOutput: { text: '(whatever you type in the terminal)' }
   },
   {
     name: 'Move & Increment',

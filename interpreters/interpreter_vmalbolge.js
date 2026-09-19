@@ -72,7 +72,7 @@
  *   Two static fields, read by the shared IDE template the same way they
  *   are for the other engines (falling back to the v1-v6 defaults when a
  *   class doesn't define them):
- *     `FEATURES`     — declares 'input' (shows the stdin field) and
+ *     `FEATURES`     — declares 'input' (enables terminal-style input) and
  *                      'memory', but not 'pixels' or 'stack', so the IDE
  *                      hides the Pixel/Dual views for this engine.
  *     `STACK_PANELS` — a "Registers" list panel (A, C, and D, each shown
@@ -170,8 +170,11 @@ class BefungeLogicInterpreter {
     this.pixels = [];          // unused — Malbolge has no pixel output
     this.pixelWidth = pixelWidth;
     this.pixelHeight = pixelHeight;
-    this.stdin = '';           // optional input source for '/' — set before running
+    this.stdin = '';           // input buffer for '/' — filled by provideInput() (or set directly before running)
     this._stdinPos = 0;
+    this.interactive = false;  // true = pause for terminal input instead of returning EOF
+    this._stdinClosed = false; // set by provideEOF() (Ctrl+D in the terminal)
+    this.awaitingInput = null; // { kind: 'char' } while paused waiting for the user to type
     this.output = '';
     this.running = false;
     this.steps = 0;
@@ -303,7 +306,25 @@ class BefungeLogicInterpreter {
       const ch = this.stdin.charCodeAt(this._stdinPos++);
       return ch === 13 ? 10 : ch; // normalize a stray CR the way a terminal would
     }
+    if (this.interactive && !this._stdinClosed) {
+      this.awaitingInput = { kind: 'char' };
+      return null; // "no input yet": _step() holds position and retries after provideInput()
+    }
     return 59048; // the spec's defined EOF value (2222222222 in ternary)
+  }
+
+  // Terminal input: whole line + newline goes in the buffer and is echoed
+  // into the output; '/' consumes it one character at a time.
+  provideInput(text) {
+    this.stdin += String(text) + '\n';
+    this.output += String(text) + '\n';
+    this.awaitingInput = null;
+  }
+
+  // Ctrl+D in the terminal: further '/' reads yield 59048 (EOF).
+  provideEOF() {
+    this._stdinClosed = true;
+    this.awaitingInput = null;
   }
 
   // ── EDITOR HIGHLIGHTING ─────────────────────────────────────────────
@@ -345,9 +366,12 @@ class BefungeLogicInterpreter {
       case '<': // out A
         this.output += String.fromCharCode(this.a % 256);
         break;
-      case '/': // in -> A
-        this.a = this._readInput();
+      case '/': { // in -> A
+        const v = this._readInput();
+        if (v === null) return true; // waiting for terminal input — hold position
+        this.a = v;
         break;
+      }
       case '*': { // rotr [D]; mov A, [D]
         const v = this._rotateRight(mem[this.d]);
         mem[this.d] = v;
@@ -403,10 +427,13 @@ class BefungeLogicInterpreter {
 
   run() {
     this.running = true;
-    this.steps = 0;
+    // run() can be resumed after the engine paused for terminal input, so
+    // only the first call resets the step counter.
+    if (!this._runStarted) { this._runStarted = true; this.steps = 0; }
     while (this.running && this.steps < this.maxSteps) {
       try {
         if (!this._step()) break;
+        if (this.awaitingInput) break; // paused for input — not a completed step
       } catch (err) {
         this.error = this._formatError(`Runtime error: ${err.message}`);
         this.running = false;
@@ -427,6 +454,7 @@ class BefungeLogicInterpreter {
       stack: [...this.stack],
       memory: { ...this.memory },
       memoryPointer: this.memoryPointer,
+      awaitingInput: this.awaitingInput,
     };
   }
 }

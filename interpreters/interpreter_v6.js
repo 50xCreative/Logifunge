@@ -48,6 +48,14 @@
  *   S   Store the top stack value at the active memory pointer
  *   L   Load the value at the active memory pointer onto the stack
  *
+ * === INPUT ===
+ *   I   Read one line from the terminal and push every character's code,
+ *       last character first, so the FIRST character ends up on top of the
+ *       stack. The newline is not pushed (an empty line pushes nothing; use
+ *       l to get the length). If no line is buffered the program pauses and
+ *       the IDE shows a terminal prompt. Ctrl+D ends input, after which I
+ *       pushes a single -1.
+ *
  * === OUTPUT ===
  *   .   Output top of stack as a decimal number
  *   =   Output top of stack as an ASCII character (e.g. 65 → 'A')
@@ -108,7 +116,7 @@ class BefungeLogicInterpreter {
   // _run-template.js) to decide things like whether to show a stdin
   // field ('input') or the Pixel/Dual output views ('pixels'). Not read
   // by this engine itself.
-  static FEATURES = ['movement', 'logic-gates', 'stack', 'memory', 'pixels', 'subroutines', 'loops', 'for-loops', 'text', 'ascii-output', 'exponents', 'elbow-redirect'];
+  static FEATURES = ['movement', 'logic-gates', 'stack', 'memory', 'pixels', 'subroutines', 'loops', 'for-loops', 'text', 'ascii-output', 'exponents', 'elbow-redirect', 'input'];
 
   // Which panels the shared IDE's Stacks view renders, and where each one
   // reads its data from on the interpreter instance. This is the default
@@ -135,6 +143,11 @@ class BefungeLogicInterpreter {
     this.pixelWidth = pixelWidth;
     this.pixelHeight = pixelHeight;
     this.stringMode = false;
+    this.stdin = '';           // input buffer for I — filled by provideInput() (or set directly before running); read a line at a time
+    this._stdinPos = 0;
+    this.interactive = false;  // true = pause for terminal input instead of pushing -1 (EOF)
+    this._stdinClosed = false; // set by provideEOF() (Ctrl+D in the terminal)
+    this.awaitingInput = null; // { kind: 'char' } while paused waiting for the user to type
     this.running = false;
     this.steps = 0;
     this.maxSteps = maxSteps;
@@ -771,6 +784,12 @@ class BefungeLogicInterpreter {
         break;
       }
 
+      case 'I': { // read one input line, push every character code (first char on top)
+        const line = this._readLine();
+        if (line === null) return true; // waiting for terminal input — hold position
+        for (let i = line.length - 1; i >= 0; i--) this._push(line[i]);
+        break;
+      }
       case 'A': {const v = this._pop(); this._push(Math.abs(v)); break}
       case 'm': {
         if (!this._requireStackDepth(2)) return this._fail('Mod requires mod(a, b)');
@@ -799,6 +818,44 @@ class BefungeLogicInterpreter {
     return true;
   }
 
+  // ── INPUT ───────────────────────────────────────────────────────
+  // Next input line as an array of character codes (newline not included),
+  // [-1] at end of input, or null when the program has to wait for the user
+  // (interactive mode) — _step() then holds position and retries the same I
+  // after provideInput().
+  _readLine() {
+    const rest = this.stdin.slice(this._stdinPos);
+    const codes = s => Array.from(s.replace(/\r$/, ''), c => c.charCodeAt(0));
+    const nl = rest.indexOf('\n');
+    if (nl !== -1) {
+      this._stdinPos += nl + 1;
+      return codes(rest.slice(0, nl));
+    }
+    if (this.interactive && !this._stdinClosed) {
+      this.awaitingInput = { kind: 'line' };
+      return null;
+    }
+    if (rest.length) { // last line with no trailing newline
+      this._stdinPos = this.stdin.length;
+      return codes(rest);
+    }
+    return [-1]; // EOF
+  }
+
+  // Terminal input: the whole line plus a newline is buffered and echoed
+  // into the output; I then consumes it a line at a time.
+  provideInput(text) {
+    this.stdin += String(text) + '\n';
+    this.output += String(text) + '\n';
+    this.awaitingInput = null;
+  }
+
+  // Ctrl+D in the terminal: further I reads push a single -1.
+  provideEOF() {
+    this._stdinClosed = true;
+    this.awaitingInput = null;
+  }
+
   _advance() {
     this.ip.x += this.dir.x;
     this.ip.y += this.dir.y;
@@ -807,10 +864,13 @@ class BefungeLogicInterpreter {
 
   run() {
     this.running = true;
-    this.steps = 0;
+    // run() can be resumed after pausing for terminal input, so only the
+    // first call resets the step counter.
+    if (!this._runStarted) { this._runStarted = true; this.steps = 0; }
     while (this.running && this.steps < this.maxSteps) {
       try {
         if (!this._step()) break;
+        if (this.awaitingInput) break; // paused for input — not a completed step
       } catch (err) {
         this.error = this._formatError(`Runtime error: ${err.message}`);
         this.running = false;
@@ -822,13 +882,15 @@ class BefungeLogicInterpreter {
       this.error = this._formatError(`Step limit (${this.maxSteps}) reached — possible infinite loop`);
     }
     return {
-      textOutput: this.output.trimEnd(),
+      // keep trailing spaces/newlines while waiting: the cursor sits right after them
+      textOutput: this.awaitingInput ? this.output : this.output.trimEnd(),
       pixels: this.pixels,
       steps: this.steps,
       error: this.error,
       stack: [...this.stack],
       memory: { ...this.memory },
       memoryPointer: this.memoryPointer,
+      awaitingInput: this.awaitingInput,
     };
   }
 }

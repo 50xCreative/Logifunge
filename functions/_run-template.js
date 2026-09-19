@@ -54,6 +54,18 @@ export const RUN_HTML_TEMPLATE = `<!DOCTYPE html>
 
   <link rel="stylesheet" href="/shared/style.css" />
   <link rel="stylesheet" href="/shared/logifunge-ace-theme.css" />
+  <style>
+    /* Terminal-style program input: a live line right after the output.
+       The real <input> is invisible; #term-line mirrors what it holds. */
+    #text-output { position: relative; }
+    #text-content, #term-line { white-space: pre-wrap; word-break: break-all; }
+    #term-input { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; margin: 0; font-size: 16px; pointer-events: none; }
+    #term-sel { background: rgba(0, 255, 136, 0.3); }
+    #term-cursor { background: #0f8; color: #111; }
+    #term-line:not(.focused) #term-cursor { background: transparent; color: inherit; outline: 1px solid #0f8; outline-offset: -1px; }
+    #term-line.focused #term-cursor { animation: term-blink 1.06s steps(1) infinite; }
+    @keyframes term-blink { 50% { background: transparent; color: inherit; } }
+  </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/mode-python.min.js"></script>
   <script src="/shared/mode-logifunge.js"></script>
@@ -103,10 +115,6 @@ export const RUN_HTML_TEMPLATE = `<!DOCTYPE html>
     <label for="max-steps">Max Steps</label>
     <input id="max-steps" type="number" value="1000000" min="1000" step="1000" />
   </div>
-  <div id="input-wrap" hidden>
-    <label for="stdin-input">Input</label>
-    <input id="stdin-input" type="text" placeholder="stdin" autocomplete="off" />
-  </div>
   <div id="spacer"></div>
   <span id="status">Ready</span>
   <div class="sep"></div>
@@ -132,9 +140,7 @@ export const RUN_HTML_TEMPLATE = `<!DOCTYPE html>
   <div id="display-pane">
     <div id="display-pane-header">Output</div>
 
-    <div id="text-output" style="overflow-y: auto;">
-      <div id="text-content"></div>
-    </div>
+    <div id="text-output" style="overflow-y: auto;"><span id="text-content"></span><span id="term-line" hidden><span id="term-before"></span><span id="term-sel"></span><span id="term-cursor">&nbsp;</span><span id="term-after"></span></span><input id="term-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Program input" /></div>
 
     <div id="pixel-output" class="visible">
       <div id="canvas-wrap">
@@ -217,8 +223,12 @@ const stackValueSearch = document.getElementById('stack-value-search');
 const stackIndexSearch = document.getElementById('stack-index-search');
 const stackSearchStatus = document.getElementById('stack-search-status');
 const btnHighlight = document.getElementById('btn-toggle-highlight');
-const inputWrap = document.getElementById('input-wrap');
-const stdinInput = document.getElementById('stdin-input');
+const termLine = document.getElementById('term-line');
+const termBefore = document.getElementById('term-before');
+const termSel = document.getElementById('term-sel');
+const termCursor = document.getElementById('term-cursor');
+const termAfter = document.getElementById('term-after');
+const termInput = document.getElementById('term-input');
 let isHighlightingOn = false;
 let engineBusy = false; // true while an engine's async prepare() or instant run is in flight
 
@@ -256,7 +266,6 @@ const hasPixelsFeature = engineFeatures.length === 0 || engineFeatures.includes(
 // 'instant' engines (currently Python) can also run start-to-finish in one
 // go, with no stepping, via runInstant() — offered as an extra Speed option.
 const hasInstantFeature = engineFeatures.includes('instant');
-if (hasInputFeature) inputWrap.hidden = false;
 if (hasInstantFeature) {
   const instantOption = document.createElement('option');
   instantOption.value = 'instant';
@@ -602,6 +611,111 @@ function renderStacks() {
 
   stackSearchStatus.textContent = \`\${statusParts.join(' / ')} match\${totalMatches === 1 ? '' : 'es'}\${anyTruncated ? ' (showing first 5,000 per list)' : ''}\`;
 }
+// ── TERMINAL INPUT ────────────────────────────────────────────
+// Engines with the 'input' feature have no stdin box. When the program asks
+// for input, the engine pauses (interp.awaitingInput) and a live input line
+// appears right after the output, like CodeHS or any browser console: type,
+// press Enter to send. Ctrl+D ends input (EOF), Up/Down recall earlier lines.
+// A hidden <input> catches the keystrokes (so mobile keyboards, paste and
+// IME just work) and #term-line mirrors it, with a block cursor.
+let termResolve = null;   // set while a line is being awaited
+let termOwner = null;     // who is waiting: 'run' | 'step' | 'turbo' | 'instant'
+const termHistory = [];
+let termHistIdx = 0;
+let termDraft = '';
+
+function renderTermLine() {
+  const v = termInput.value;
+  let s = termInput.selectionStart, e = termInput.selectionEnd;
+  if (s === null || e === null) { s = e = v.length; }
+  termBefore.textContent = v.slice(0, s);
+  if (s === e) {
+    termSel.textContent = '';
+    termCursor.style.display = '';
+    termCursor.textContent = v.charAt(s) || '\\u00a0';
+    termAfter.textContent = v.slice(s + 1);
+  } else {
+    termSel.textContent = v.slice(s, e);
+    termCursor.style.display = 'none';
+    termAfter.textContent = v.slice(e);
+  }
+  textOutput.scrollTop = textOutput.scrollHeight;
+}
+
+// Shows the input line and resolves with { text } (Enter), { eof: true }
+// (Ctrl+D), or null if it was cancelled (Stop, new run, Clear).
+function terminalReadLine(owner) {
+  cancelTerminalInput();
+  if (outputMode !== 'text' && outputMode !== 'both') setMode('text');
+  termOwner = owner;
+  termLine.hidden = false;
+  termInput.value = '';
+  termHistIdx = termHistory.length;
+  renderTermLine();
+  termInput.focus({ preventScroll: true });
+  setStatus('Waiting for input… (Enter sends, Ctrl+D ends input)', 'ok');
+  return new Promise(resolve => { termResolve = resolve; });
+}
+
+function finishTermLine(result) {
+  if (!termResolve) return;
+  const resolve = termResolve;
+  termResolve = null;
+  termOwner = null;
+  termLine.hidden = true;
+  termInput.value = '';
+  resolve(result);
+}
+
+function cancelTerminalInput() {
+  finishTermLine(null);
+  termLine.hidden = true;
+  termOwner = null;
+}
+
+// Hands whatever the user typed to the engine. Async because Python has to
+// re-record its run with the new line.
+async function deliverTerminalResult(interp, res) {
+  if (res.eof) await interp.provideEOF();
+  else await interp.provideInput(res.text);
+}
+
+termInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.isComposing) {
+    e.preventDefault();
+    const text = termInput.value;
+    if (text !== '' && termHistory[termHistory.length - 1] !== text) termHistory.push(text);
+    finishTermLine({ text });
+    return;
+  }
+  if (e.ctrlKey && (e.key === 'd' || e.key === 'D')) {
+    e.preventDefault();
+    finishTermLine({ eof: true });
+    return;
+  }
+  if (e.key === 'ArrowUp' && termHistIdx > 0) {
+    e.preventDefault();
+    if (termHistIdx === termHistory.length) termDraft = termInput.value;
+    termHistIdx--;
+    termInput.value = termHistory[termHistIdx];
+    termInput.setSelectionRange(termInput.value.length, termInput.value.length);
+  } else if (e.key === 'ArrowDown' && termHistIdx < termHistory.length) {
+    e.preventDefault();
+    termHistIdx++;
+    termInput.value = termHistIdx === termHistory.length ? termDraft : termHistory[termHistIdx];
+    termInput.setSelectionRange(termInput.value.length, termInput.value.length);
+  }
+  setTimeout(renderTermLine, 0); // caret keys move the cursor after keydown
+});
+['input', 'keyup', 'mouseup', 'select', 'focus'].forEach(ev => termInput.addEventListener(ev, renderTermLine));
+termInput.addEventListener('focus', () => termLine.classList.add('focused'));
+termInput.addEventListener('blur', () => termLine.classList.remove('focused'));
+document.addEventListener('selectionchange', () => { if (document.activeElement === termInput) renderTermLine(); });
+// Clicking anywhere in the output (without selecting text) focuses the prompt.
+textOutput.addEventListener('click', () => {
+  if (termResolve && window.getSelection().isCollapsed) termInput.focus({ preventScroll: true });
+});
+
 // ── TURBO WORKER ─────────────────────────────────────────────
 let turboWorker = null;
 let turboWorkerBusy = false;
@@ -610,15 +724,12 @@ function getTurboWorker() {
   if (turboWorker) return turboWorker;
   const workerSrc = \`
     importScripts(\${JSON.stringify(new URL('/interpreter?v=__VERSION_NUM__', location.origin).href)});
-    self.onmessage = async function(e) {
-      const { code, w, h, maxSteps, stdin } = e.data;
-      const interp = new BefungeLogicInterpreter(code, w, h, maxSteps);
-      if (stdin !== undefined) interp.stdin = stdin;
-      if (typeof interp.prepare === 'function') await interp.prepare();
-      const result = interp.run();
-      const pixelBuf = new Uint32Array(result.pixels.length * 3);
-      for (let i = 0; i < result.pixels.length; i++) {
-        const p = result.pixels[i];
+    let interp = null;
+    function post(result) {
+      const pixels = result.pixels || [];
+      const pixelBuf = new Uint32Array(pixels.length * 3);
+      for (let i = 0; i < pixels.length; i++) {
+        const p = pixels[i];
         pixelBuf[i * 3]     = p.x;
         pixelBuf[i * 3 + 1] = p.y;
         pixelBuf[i * 3 + 2] = p.on ? 1 : 0;
@@ -626,9 +737,28 @@ function getTurboWorker() {
       self.postMessage(
         { textOutput: result.textOutput, pixelBuf, steps: result.steps,
           error: result.error, stack: result.stack, memory: result.memory,
-          memoryPointer: result.memoryPointer },
+          memoryPointer: result.memoryPointer, awaitingInput: !!result.awaitingInput },
         [pixelBuf.buffer]
       );
+    }
+    self.onmessage = async function(e) {
+      const m = e.data;
+      if (m.type === 'input') {
+        // The program paused for terminal input; feed it and carry on.
+        if (!interp) return;
+        if (m.eof) await interp.provideEOF(); else await interp.provideInput(m.text);
+        if (interp.error) {
+          post({ textOutput: interp.output, pixels: [], steps: interp.steps, error: interp.error,
+                 stack: [...interp.stack], memory: { ...interp.memory }, memoryPointer: interp.memoryPointer });
+        } else {
+          post(interp.run());
+        }
+        return;
+      }
+      interp = new BefungeLogicInterpreter(m.code, m.w, m.h, m.maxSteps);
+      interp.interactive = true;
+      if (typeof interp.prepare === 'function') await interp.prepare();
+      post(interp.run());
     };
   \`;
   const blob = new Blob([workerSrc], { type: 'application/javascript' });
@@ -659,6 +789,7 @@ function getMaxSteps() {
 }
 
 function stopAutoRun(terminateWorker = false) {
+  cancelTerminalInput();
   if (runTimer) {
     clearTimeout(runTimer);
     runTimer = null;
@@ -676,8 +807,11 @@ function stopAutoRun(terminateWorker = false) {
 }
 
 function updateDisplay(interp, w, h) {
-  const text = interp.output.trimEnd();
-  textContent.textContent = text || '— no text output (use . to print) —';
+  // While the program is waiting for input, keep trailing spaces/newlines: the
+  // cursor sits exactly where the prompt ends.
+  const waiting = !!interp.awaitingInput;
+  const text = waiting ? interp.output : interp.output.trimEnd();
+  textContent.textContent = text || (waiting ? '' : '— no text output (use . to print) —');
   if (outputMode === 'text' || outputMode === 'both') textContent.style.color = text ? '#0f8' : '#444';
   setupCanvas(w, h);
   if (interp.pixels.length) drawPixels(interp.pixels, w, h);
@@ -718,29 +852,50 @@ async function prepareEngine(interp) {
 // runInstant() is a Promise (Python loads Pyodide on first use), and it
 // can't be interrupted, so Run is disabled until it finishes.
 async function runInstantEngine(code) {
-  engineBusy = true;
-  btnRun.disabled = true;
-  btnStep.disabled = true;
+  stepInterp = null; // a later Step starts a fresh stepped run
   btnRun.classList.add('running');
   btnRun.textContent = '■ Running';
-  setStatus('Starting…');
-  stepInterp = null; // a later Step starts a fresh stepped run
 
   const interp = new BefungeLogicInterpreter(code, 32, 32, getMaxSteps());
-  if (hasInputFeature) interp.stdin = stdinInput.value;
+  interp.interactive = true;
   interp.onStatus = msg => setStatus(msg);
   runInterp = interp;
 
   try {
-    const result = await interp.runInstant();
-    const text = (result.textOutput || '').trimEnd();
-    textContent.textContent = text || '— no text output (use print()) —';
-    if (outputMode === 'text' || outputMode === 'both') textContent.style.color = text ? '#0f8' : '#444';
-    clearActiveCellHighlight();
-    showStackBar(result);
-    showStacks(result);
-    if (result.error) setStatus(\`⚠ \${result.error}\`, 'err');
-    else setStatus('Done — instant run', 'ok');
+    // Runs the whole program; if it hits input() it stops there, we ask in
+    // the terminal, then run it again with the extra line (see the Python
+    // engine's INPUT notes).
+    while (true) {
+      engineBusy = true;
+      btnRun.disabled = true;
+      btnStep.disabled = true;
+      setStatus('Starting…');
+      const result = await interp.runInstant();
+      engineBusy = false;
+      btnRun.disabled = false;
+      if (runInterp !== interp) return;
+
+      const waiting = !!result.awaitingInput;
+      const raw = result.textOutput || '';
+      const text = waiting ? raw : raw.trimEnd();
+      textContent.textContent = text || (waiting ? '' : '— no text output (use print()) —');
+      if (outputMode === 'text' || outputMode === 'both') textContent.style.color = text ? '#0f8' : '#444';
+      clearActiveCellHighlight();
+      showStackBar(result);
+      showStacks(result);
+
+      if (waiting) {
+        btnRun.textContent = '■ Stop';
+        const res = await terminalReadLine('instant');
+        if (!res || runInterp !== interp) return; // stopped while waiting
+        btnRun.textContent = '■ Running';
+        await deliverTerminalResult(interp, res);
+        continue;
+      }
+      if (result.error) setStatus('⚠ ' + result.error, 'err');
+      else setStatus('Done — instant run', 'ok');
+      break;
+    }
   } catch (e) {
     setStatus('Error: ' + e.message, 'err');
   } finally {
@@ -749,16 +904,19 @@ async function runInstantEngine(code) {
     btnStep.disabled = false;
     btnRun.classList.remove('running');
     btnRun.textContent = '▶ Run';
+    if (termOwner === 'instant') cancelTerminalInput();
   }
 }
 
 function run() {
   if (engineBusy) return; // an engine is still loading/preparing; Run/Step are disabled meanwhile anyway
-  if (runTimer || turboWorkerBusy) {
+  if (runTimer || turboWorkerBusy || termOwner === 'run' || termOwner === 'instant') {
     stopAutoRun(true);
     setStatus('Run Stopped');
     return;
   }
+  if (termOwner === 'step') stepInterp = null; // abandon a stepped session that was waiting for input
+  cancelTerminalInput();
 
   const code = aceEditor.getValue();
   if (!code.trim()) { setStatus('No Code'); return; }
@@ -776,21 +934,29 @@ function run() {
     const worker = getTurboWorker();
     turboWorkerBusy = true;
     worker.onmessage = (e) => {
-      turboWorkerBusy = false;
-      const { textOutput, pixelBuf, steps, error, stack, memory, memoryPointer } = e.data;
+      const { textOutput, pixelBuf, steps, error, stack, memory, memoryPointer, awaitingInput } = e.data;
       const pixels = [];
       for (let i = 0; i < pixelBuf.length; i += 3) {
         const on = pixelBuf[i + 2] !== 0;
         pixels.push({ x: pixelBuf[i], y: pixelBuf[i + 1], on, value: on ? 1 : 0 });
       }
       const text = textOutput;
-      textContent.textContent = text || '— no text output (use . to print) —';
+      textContent.textContent = text || (awaitingInput ? '' : '— no text output (use . to print) —');
       if (outputMode === 'text' || outputMode === 'both') textContent.style.color = text ? '#0f8' : '#444';
       setupCanvas(w, h);
       if (pixels.length) drawPixels(pixels, w, h);
       showStackBar({ stack, memory, memoryPointer });
       showStacks({ stack, memory, memoryPointer });
       clearActiveCellHighlight();
+      if (awaitingInput) {
+        // Paused for terminal input: keep the worker (and the Stop button) alive.
+        terminalReadLine('turbo').then(res => {
+          if (!res || !turboWorkerBusy) return;
+          worker.postMessage({ type: 'input', text: res.text, eof: !!res.eof });
+        });
+        return;
+      }
+      turboWorkerBusy = false;
       btnRun.classList.remove('running');
       btnRun.textContent = '▶ Run';
       if (error) { setStatus(\`⚠ \${error}\`, 'err'); } 
@@ -804,16 +970,34 @@ function run() {
       setStatus('Worker Error: ' + e.message, 'err');
     };
     setupCanvas(w, h);
-    worker.postMessage({ code: execCode, w, h, maxSteps: getMaxSteps(), stdin: hasInputFeature ? stdinInput.value : undefined });
+    worker.postMessage({ type: 'start', code: execCode, w, h, maxSteps: getMaxSteps() });
     return;
   }
 
   runInterp = new BefungeLogicInterpreter(execCode, w, h, getMaxSteps());
-  if (hasInputFeature) runInterp.stdin = stdinInput.value;
+  runInterp.interactive = true; // programs pause for terminal input instead of hitting EOF
   runInterp.running = true;
   updateDisplay(runInterp, w, h);
 
   const interp = runInterp;
+  // The engine paused on input: show the terminal line, feed it what the user
+  // types, then carry on stepping.
+  const promptForRunInput = () => {
+    updateDisplay(interp, w, h);
+    terminalReadLine('run').then(async res => {
+      if (!res || runInterp !== interp) return; // stopped while waiting
+      await deliverTerminalResult(interp, res);
+      if (runInterp !== interp) return;
+      if (interp.error) {
+        updateDisplay(interp, w, h);
+        setStatus('⚠ ' + interp.error, 'err');
+        stopAutoRun();
+        return;
+      }
+      setStatus('Running…', 'ok');
+      tick();
+    });
+  };
   const tick = () => {
     if (!runInterp || !runInterp.running) { stopAutoRun(); return; }
     try {
@@ -831,6 +1015,7 @@ function run() {
           return;
         }
         cont = runInterp._step();
+        if (runInterp.awaitingInput) { promptForRunInput(); return; } // paused for input — not a completed step
         if (cont) runInterp.steps++;
         if (runInterp.error) {
           updateDisplay(runInterp, w, h);
@@ -874,6 +1059,7 @@ function run() {
 // ── STEP ──────────────────────────────────────────────────────
 async function stepOnce() {
   if (engineBusy) return;
+  if (termOwner) { termInput.focus({ preventScroll: true }); return; } // already waiting for input
   const code = aceEditor.getValue();
   if (!code.trim()) { setStatus('No Code'); return; }
   stepW = Math.max(1, Math.min(256, parseInt(inpW.value) || 32));
@@ -884,7 +1070,7 @@ async function stepOnce() {
     stepInterp.pixelHeight !== stepH;
   if (shouldResetStepInterp) {
     stepInterp = new BefungeLogicInterpreter(code, stepW, stepH, getMaxSteps());
-    if (hasInputFeature) stepInterp.stdin = stdinInput.value;
+    stepInterp.interactive = true;
     stepInterp.running = true;
     setupCanvas(stepW, stepH);
     setStatus('Step Mode');
@@ -901,19 +1087,47 @@ async function stepOnce() {
   }
   if (!stepInterp.running) { setStatus('Done', 'ok'); return; }
   const cont = stepInterp._step();
-  if (cont) stepInterp.steps++;
+  if (cont && !stepInterp.awaitingInput) stepInterp.steps++;
   updateDisplay(stepInterp, stepW, stepH);
   highlightActiveCell(stepInterp);
-  setStatus(\`Step \${stepInterp.steps} — IP(\${stepInterp.ip.x},\${stepInterp.ip.y})\`);
-  if (!cont || !stepInterp.running) {
-    if (stepInterp.error) setStatus(\`⚠ \${stepInterp.error}\`, 'err');
-    else setStatus(\`Done — \${stepInterp.steps} steps\`, 'ok');
-    stepInterp = null;
+  reportStep(stepInterp, cont);
+}
+
+// Status line after a step, and end-of-run bookkeeping. If the engine paused
+// on input, hand over to the terminal instead.
+function reportStep(interp, cont) {
+  if (interp.awaitingInput) { promptForStepInput(interp); return; }
+  setStatus('Step ' + interp.steps + ' — IP(' + interp.ip.x + ',' + interp.ip.y + ')');
+  if (!cont || !interp.running) {
+    if (interp.error) setStatus('⚠ ' + interp.error, 'err');
+    else setStatus('Done — ' + interp.steps + ' steps', 'ok');
+    if (stepInterp === interp) stepInterp = null;
   }
+}
+
+function promptForStepInput(interp) {
+  terminalReadLine('step').then(async res => {
+    if (!res || stepInterp !== interp) return;
+    await deliverTerminalResult(interp, res);
+    if (stepInterp !== interp) return;
+    if (interp.error) {
+      updateDisplay(interp, stepW, stepH);
+      setStatus('⚠ ' + interp.error, 'err');
+      stepInterp = null;
+      return;
+    }
+    // Carry out the instruction that was waiting for this input.
+    const cont = interp._step();
+    if (cont && !interp.awaitingInput) interp.steps++;
+    updateDisplay(interp, stepW, stepH);
+    highlightActiveCell(interp);
+    reportStep(interp, cont);
+  });
 }
 
 // ── CLEAR OUTPUT ─────────────────────────────────────────────
 function clearOutput() {
+  if (termOwner) { stopAutoRun(true); stepInterp = null; setStatus('Run Stopped'); }
   if (outputMode === 'text' || outputMode === 'both') {
     textContent.textContent = '';
   }

@@ -94,6 +94,13 @@ const examples = [
     desc: 'E turns 90° clockwise on a popped 0, else keeps going straight',
     code: '90E\n  .\n  %',
     expectedOutput: { text: '9' }
+  },
+  {
+    name: 'Echo Input',
+    mode: 'text',
+    desc: 'I reads a line from the terminal and pushes every character (first on top). Type a line and press Enter; the loop prints it back',
+    code: 'Il([p]=)[p]%',
+    expectedOutput: { text: '(whatever you type in the terminal)' }
   }
 ];
 

@@ -37,9 +37,9 @@ const examples = [
   {
     name: 'Echo Input',
     mode: 'text',
-    desc: "GIMMEH reads one line into a variable. Set the Input field (top bar) before running — each line becomes one GIMMEH call, in order",
+    desc: "GIMMEH reads one line into a variable. The run pauses there — type your answer in the terminal and press Enter",
     code: 'HAI 1.2\nI HAS A NAME\nGIMMEH NAME\nVISIBLE "HAI " AN NAME\nKTHXBYE',
-    expectedOutput: { text: '(depends on the Input field)' }
+    expectedOutput: { text: '(depends on what you type)' }
   }
 ];
 

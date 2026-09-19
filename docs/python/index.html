@@ -19,10 +19,10 @@ output: Hello, World!</pre>
 
   <section>
     <h2>Input</h2>
-    <p>The IDE's top bar shows an <b>Input</b> field for this engine. Whatever you type there is split into lines before the program starts, and each call to <span class="command">input()</span> pops the next line off the front of it. Once the field's lines are exhausted, a further <span class="command">input()</span> call raises the normal <span class="command">EOFError</span> — the same thing that happens when a real program's stdin runs dry.</p>
+    <p>Input works like a terminal. When the program reaches <span class="command">input()</span>, its prompt is printed to the output and a blinking cursor appears right after it. Type your answer and press <b>Enter</b>: the line is echoed into the output and returned from <span class="command">input()</span>. Press <b>Ctrl+D</b> to end input &mdash; a further <span class="command">input()</span> call then raises the normal <span class="command">EOFError</span>, just as a real program does when stdin closes. Up/Down recall earlier lines.</p>
     <pre>name = input("name: ")
 print(f"hello, {name}!")</pre>
-    <p>Note that any prompt text passed to <span class="command">input()</span> is not itself written to the output here, since there's nowhere for it to appear before the field is read — type your answer into Input ahead of time rather than waiting for a prompt to show up.</p>
+    <p>Only <span class="command">input()</span> is connected to the terminal; <span class="command">sys.stdin</span> is not.</p>
   </section>
 
   <section>
@@ -43,13 +43,13 @@ for n in range(3):
     total += n
 print(total)</pre>
     <p>Only the lines you typed are stepped. A call into the standard library or another module counts as part of the line that made it.</p>
-    <p>If you don't want any of that, choose <b>Instant</b> in the Speed menu. Instant runs the program straight through at full CPython speed with no stepping and no Max Steps limit, then shows the final output and the final variables. It behaves like a normal Python runtime: <span class="command">input()</span> still reads from the Input field, and top-level <span class="command">await</span> works. The trade-off is that an infinite loop will freeze the tab, and Run can't be stopped once it starts.</p>
-    <p>Under the hood, the first time you press Run or Step the program is executed once, start to finish, while every line and its variables are recorded; Step and Run then replay that recording. Two things follow from this: <span class="command">input()</span> reads from the Input field up front instead of waiting for you, and the program can't be paused partway — an infinite loop simply stops at the <b>Max Steps</b> limit with a "Step limit reached" error. Each run starts with a fresh namespace, so variables never carry over from one run to the next.</p>
+    <p>If you don't want any of that, choose <b>Instant</b> in the Speed menu. Instant runs the program straight through at full CPython speed with no stepping and no Max Steps limit, then shows the final output and the final variables. It behaves like a normal Python runtime: <span class="command">input()</span> still pauses for the terminal, and top-level <span class="command">await</span> works. The trade-off is that an infinite loop will freeze the tab, and Run can't be stopped once it starts.</p>
+    <p>Under the hood, the first time you press Run or Step the program is executed once, start to finish, while every line and its variables are recorded; Step and Run then replay that recording. Two things follow from this: the program can't be paused partway — an infinite loop simply stops at the <b>Max Steps</b> limit with a "Step limit reached" error. Each run starts with a fresh namespace, so variables never carry over from one run to the next. Because of the record-and-replay design, each time you answer an <span class="command">input()</span> the program is recorded again from the top with your answer included (with <span class="command">random</span> seeded so it behaves identically), so side effects other than printing — the clock, for instance — are repeated.</p>
   </section>
 
   <section>
     <h2>Using the IDE with Python</h2>
-    <p>The IDE is the same one the other engines use, with a couple of things tailored for Python: the Pixel and Dual output views are hidden, since Python has no pixel output here — only <b>Text</b> and <b>Stacks</b> are shown, and the Stacks view shows a single <b>Variables</b> panel instead of the Data Stack + Memory pair. Because each step covers one line, the active-cell highlight spans the whole line being executed. Step, Run, Speed, Max Steps, the Input field, and syntax highlighting all work the same as on the other engines' pages, including Turbo mode. Python's Speed menu has one extra entry, <b>Instant</b>, described above.</p>
+    <p>The IDE is the same one the other engines use, with a couple of things tailored for Python: the Pixel and Dual output views are hidden, since Python has no pixel output here — only <b>Text</b> and <b>Stacks</b> are shown, and the Stacks view shows a single <b>Variables</b> panel instead of the Data Stack + Memory pair. Because each step covers one line, the active-cell highlight spans the whole line being executed. Step, Run, Speed, Max Steps, terminal input, and syntax highlighting all work the same as on the other engines' pages, including Turbo mode. Python's Speed menu has one extra entry, <b>Instant</b>, described above.</p>
     <p><a href="../../python/">Open the Python IDE</a></p>
   </section>
 </main><script src="../docs.js"></script>

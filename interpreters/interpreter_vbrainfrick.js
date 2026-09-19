@@ -43,18 +43,20 @@
  *   class doesn't define them) so none of that shared chrome needs to hard
  *   -code anything engine-specific:
  *     `FEATURES`     — capability flags. This engine declares 'input' (so
- *                      the IDE shows a stdin field that feeds `this.stdin`)
+ *                      the IDE shows a terminal-style input line and feeds `this.stdin` via provideInput())
  *                      and 'memory', but not 'pixels' or 'stack', so the
  *                      IDE hides the Pixel/Dual views for this engine.
  *     `STACK_PANELS` — which panels the Stacks view renders and where each
  *                      one reads its data from on the interpreter instance.
  *
  * === INPUT ===
- *   The shared IDE has no stdin box, so `,` reads from `this.stdin`, a
- *   plain string that can be set on the interpreter instance before
- *   run()/step() is called (empty by default). Once `this.stdin` is
- *   exhausted, further `,` reads store 0 in the current cell — the common
- *   "EOF is zero" convention.
+ *   `,` reads from `this.stdin`, a plain string buffer. In the IDE the
+ *   engine runs with `interactive = true`: when the buffer is empty `,`
+ *   pauses (`awaitingInput`) and the terminal asks the user, who answers via
+ *   provideInput(line) (line + newline is buffered and echoed to the output)
+ *   or provideEOF() (Ctrl+D). With `interactive` false (or after EOF),
+ *   further `,` reads store 0 in the current cell — the common "EOF is
+ *   zero" convention.
  *
  * === OUTPUT ===
  *   `.` appends a character to `this.output` (a plain string, matching the
@@ -90,8 +92,11 @@ class BefungeLogicInterpreter {
     this.pixels = [];          // unused — Brainfuck has no pixel output
     this.pixelWidth = pixelWidth;
     this.pixelHeight = pixelHeight;
-    this.stdin = '';           // optional input source for ',' — set before running
+    this.stdin = '';           // input buffer for ',' — filled by provideInput() (or set directly before running)
     this._stdinPos = 0;
+    this.interactive = false;  // true = pause for terminal input instead of returning EOF
+    this._stdinClosed = false; // set by provideEOF() (Ctrl+D in the terminal)
+    this.awaitingInput = null; // { kind: 'char' } while paused waiting for the user to type
     this.running = false;
     this.steps = 0;
     this.maxSteps = maxSteps;
@@ -155,7 +160,28 @@ class BefungeLogicInterpreter {
     if (this._stdinPos < this.stdin.length) {
       return this.stdin.charCodeAt(this._stdinPos++);
     }
+    if (this.interactive && !this._stdinClosed) {
+      this.awaitingInput = { kind: 'char' };
+      return null; // null = "no input yet": _step() holds position and retries after provideInput()
+    }
     return 0; // EOF convention
+  }
+
+  // ── TERMINAL INPUT ──────────────────────────────────────────────
+  // Called by the IDE when the user presses Enter in the terminal. Like a
+  // real (line-buffered) terminal, the whole line plus a newline goes into
+  // the buffer and is echoed into the output; ',' then consumes it one
+  // character at a time.
+  provideInput(text) {
+    this.stdin += String(text) + '\n';
+    this.output += String(text) + '\n';
+    this.awaitingInput = null;
+  }
+
+  // Ctrl+D in the terminal: no more input, further ',' reads give 0.
+  provideEOF() {
+    this._stdinClosed = true;
+    this.awaitingInput = null;
   }
 
   _formatError(message, cell = null, x = this.ip.x, y = this.ip.y) {
@@ -184,7 +210,12 @@ class BefungeLogicInterpreter {
       case '+': this._setCell(this._cell() + 1); break;
       case '-': this._setCell(this._cell() - 1); break;
       case '.': this.output += String.fromCharCode(this._cell()); break;
-      case ',': this.memory[this.memoryPointer] = this._readInput(); break;
+      case ',': {
+        const v = this._readInput();
+        if (v === null) return true; // waiting for terminal input — hold position
+        this.memory[this.memoryPointer] = v;
+        break;
+      }
 
       case '[': {
         if (this._cell() === 0) {
@@ -217,10 +248,13 @@ class BefungeLogicInterpreter {
 
   run() {
     this.running = true;
-    this.steps = 0;
+    // run() can be resumed after the engine paused for terminal input, so
+    // only the first call resets the step counter.
+    if (!this._runStarted) { this._runStarted = true; this.steps = 0; }
     while (this.running && this.steps < this.maxSteps) {
       try {
         if (!this._step()) break;
+        if (this.awaitingInput) break; // paused for input — not a completed step
       } catch (err) {
         this.error = this._formatError(`Runtime error: ${err.message}`);
         this.running = false;
@@ -239,6 +273,7 @@ class BefungeLogicInterpreter {
       stack: [...this.stack],
       memory: { ...this.memory },
       memoryPointer: this.memoryPointer,
+      awaitingInput: this.awaitingInput,
     };
   }
 }

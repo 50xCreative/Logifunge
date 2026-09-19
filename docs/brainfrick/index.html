@@ -35,11 +35,11 @@ output: A</pre>
 
   <section>
     <h2>Input</h2>
-    <p>Brainfuck's <span class="command">,</span> command reads one character at a time from an input source. The IDE's top bar shows an <b>Input</b> field for this engine — type or paste text into it before pressing Run or Step, and each <span class="command">,</span> pulls the next character's ASCII code off the front of it. Once the field is exhausted, further <span class="command">,</span> reads store 0 in the current cell (the common "EOF is zero" convention).</p>
+    <p>Brainfuck's <span class="command">,</span> command reads one character at a time. Input works like a terminal: when the program reaches a <span class="command">,</span> with nothing left to read, it pauses and a blinking cursor appears at the end of the Output pane. Type a line and press <b>Enter</b>; the line (plus a newline) is echoed into the output and each <span class="command">,</span> pulls the next character's ASCII code off it, pausing again whenever it runs dry. Press <b>Ctrl+D</b> to end input (EOF) &mdash; after that, further <span class="command">,</span> reads store 0 in the current cell (the common "EOF is zero" convention). Up/Down recall earlier lines.</p>
     <pre>,[.,]
-Input: hi
+You type: hi (then Enter), then Ctrl+D
 output: hi</pre>
-    <p>This reads and immediately echoes each character until input runs out: <span class="command">,</span> reads one character, the loop body prints it and reads the next, and the loop ends once a read comes back 0.</p>
+    <p>This reads and immediately echoes each character until input runs out: <span class="command">,</span> reads one character, the loop body prints it and reads the next, and the loop ends once a read comes back 0 &mdash; which in the terminal happens when you press Ctrl+D.</p>
   </section>
 
   <section>

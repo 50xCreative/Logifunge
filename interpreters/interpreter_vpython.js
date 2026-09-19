@@ -27,9 +27,9 @@
  *      engines use, so Turbo mode (which runs `run()` in a worker) works too.
  *
  *   The one place this differs from a live debugger: the program has already
- *   finished by the time you press Step. That means `input()` reads from the
- *   Input field up front (it can't wait for you), and side effects such as
- *   an infinite `print` loop are cut off at the step cap rather than by Stop.
+ *   finished by the time you press Step, so side effects such as an infinite
+ *   `print` loop are cut off at the step cap rather than by Stop. (input()
+ *   still pauses for you — see INPUT below.)
  *
  * === WHAT THE IDE SHOWS ===
  *   - Highlight: the whole source line about to run (the line is highlighted
@@ -44,9 +44,21 @@
  *     traceback at the end and sets the error shown in the status bar.
  *
  * === INPUT ===
- *   The shared IDE's Input field (`this.stdin`) is split into lines and
- *   Python's `input()` is patched to pop one per call, raising the usual
- *   EOFError once they're gone. Every run starts in a fresh namespace.
+ *   input() behaves like a terminal. The prompt text is written to the
+ *   output, and when the program asks for a line the engine pauses
+ *   (`awaitingInput`) while the IDE shows a blinking input right after the
+ *   prompt. Enter calls provideInput(line); Ctrl+D calls provideEOF(), after
+ *   which input() raises the usual EOFError. The typed line is echoed into
+ *   the output, exactly as a console would.
+ *
+ *   Because the program is recorded rather than run live (see above), a
+ *   pause works by "record, stop at input(), ask, re-record": input() raises
+ *   an internal exception when it has no line, the recording ends there, and
+ *   after the user answers the program is recorded again with the extra line.
+ *   The recording is identical up to that point (`random` is seeded with a
+ *   fixed per-run seed so it stays that way), so replay carries on where it
+ *   left off. Side effects other than print() — clocks, files, network —
+ *   will be repeated on each re-run.
  *
  * === INSTANT RUN ===
  *   The Speed menu's "Instant" option (feature flag 'instant') skips the
@@ -74,7 +86,7 @@
 // which executes `src` once under sys.settrace and returns the recording.
 // (String.raw keeps the "\n" escapes below as Python escapes, not JS ones.)
 const PY_TRACE_RUNNER = String.raw`
-import sys, builtins, reprlib, traceback, types, linecache
+import sys, builtins, reprlib, traceback, types, linecache, random
 
 _lf_short = reprlib.Repr()
 _lf_short.maxstring = 60
@@ -117,13 +129,28 @@ class _LfOut:
     def isatty(self):
         return False
 
-def _lf_make_input(stdin_lines):
+# Raised by input() when the terminal has no line for it yet. It derives from
+# BaseException so a program's own "except Exception" can't swallow it. The
+# JS side shows the prompt, waits for the user, then re-runs the program with
+# the extra line (see "INPUT" in the header comment).
+class _LfNeedInput(BaseException):
+    pass
+
+def _lf_make_input(stdin_lines, closed, out):
     stdin_iter = iter(list(stdin_lines))
     def fake_input(prompt=''):
+        # Like a real terminal: the prompt is printed, then the typed line is
+        # echoed, so the output reads exactly as it would in a console.
+        if prompt != '':
+            out.write(str(prompt))
         try:
-            return next(stdin_iter)
+            line = next(stdin_iter)
         except StopIteration:
-            raise EOFError('EOF when reading a line') from None
+            if closed:
+                raise EOFError('EOF when reading a line') from None
+            raise _LfNeedInput() from None
+        out.write(line + '\n')
+        return line
     return fake_input
 
 _LF_USER = '<user>'
@@ -160,12 +187,14 @@ def _lf_user_traceback(exc):
 # runs the program, end() restores everything and returns the results.
 _lf_instant = {}
 
-def _logifunge_instant_begin(src, stdin_lines):
+def _logifunge_instant_begin(src, stdin_lines, closed=False, seed=0):
     out = _LfOut()
     _lf_instant['out'] = out
+    _lf_instant['need'] = False
+    random.seed(seed)
     _lf_instant['saved'] = (sys.stdout, sys.stderr, builtins.input)
     sys.stdout = sys.stderr = out
-    builtins.input = _lf_make_input(stdin_lines)
+    builtins.input = _lf_make_input(stdin_lines, closed, out)
     linecache.cache[_LF_USER] = (len(src), None, src.splitlines(True), _LF_USER)
 
 async def _logifunge_instant_run(src, ns):
@@ -173,6 +202,9 @@ async def _logifunge_instant_run(src, ns):
     try:
         await eval_code_async(src, ns, filename=_LF_USER)
     except SystemExit:
+        return None
+    except _LfNeedInput:
+        _lf_instant['need'] = True
         return None
     except BaseException as exc:
         _lf_instant['out'].write(_lf_user_traceback(exc))
@@ -185,11 +217,13 @@ def _logifunge_instant_end(ns):
     return {
         'output': ''.join(_lf_instant['out'].parts),
         'final': _lf_entries(ns),
+        'need': _lf_instant['need'],
     }
 
 # --- traced run: executes src under sys.settrace and returns the recording
-def _logifunge_trace(src, stdin_lines, max_steps):
+def _logifunge_trace(src, stdin_lines, max_steps, closed=False, seed=0):
     USER = _LF_USER
+    random.seed(seed)  # same seed every re-run, so replays are identical
 
     class StepLimit(BaseException):
         pass
@@ -219,9 +253,10 @@ def _logifunge_trace(src, stdin_lines, max_steps):
 
     ns = {'__name__': '__main__', '__builtins__': builtins}
     error = None
+    need = False
     saved = (sys.stdout, sys.stderr, builtins.input)
     sys.stdout = sys.stderr = out
-    builtins.input = _lf_make_input(stdin_lines)
+    builtins.input = _lf_make_input(stdin_lines, closed, out)
     linecache.cache[USER] = (len(src), None, src.splitlines(True), USER)
     try:
         try:
@@ -237,6 +272,8 @@ def _logifunge_trace(src, stdin_lines, max_steps):
                 error = 'Step limit (' + str(max_steps) + ') reached - possible infinite loop'
             except SystemExit:
                 pass
+            except _LfNeedInput:
+                need = True
             except BaseException as exc:
                 error = _lf_describe(exc)
                 out.write(_lf_user_traceback(exc))
@@ -254,6 +291,7 @@ def _logifunge_trace(src, stdin_lines, max_steps):
         'output': ''.join(out.parts),
         'final': _lf_entries(ns),
         'error': error,
+        'need': need,
     }
 `;
 
@@ -292,7 +330,13 @@ class BefungeLogicInterpreter {
     this.pixels = [];
     this.pixelWidth = pixelWidth;
     this.pixelHeight = pixelHeight;
-    this.stdin = '';                   // fed to input(), one line per call — set before prepare()
+    this.stdin = '';                   // legacy: pre-supplied lines for input() (the IDE now uses provideInput())
+    this.interactive = false;          // kept for parity with the other engines; input() always pauses when out of lines
+    this.awaitingInput = null;         // { kind: 'line' } while paused waiting for the user to type
+    this._inputLines = null;           // lines typed so far (lazily seeded from `stdin`)
+    this._eof = false;                 // Ctrl+D pressed: input() now raises EOFError
+    this._seed = Math.floor(Math.random() * 2147483647); // fixed per run so re-recordings match
+    this._runStarted = false;
     this.running = false;
     this.steps = 0;
     this.maxSteps = maxSteps;
@@ -374,14 +418,26 @@ class BefungeLogicInterpreter {
   // Never throws — failures land in `this.error`, like runtime errors do.
   async prepare() {
     if (this._trace || this.error) return;
+    await this._record();
+  }
+
+  _lines() {
+    if (this._inputLines === null) this._inputLines = this.stdin ? String(this.stdin).split('\n') : [];
+    return this._inputLines;
+  }
+
+  // Records the whole program once under sys.settrace with the lines typed
+  // so far. If input() runs out of lines, the recording simply ends there
+  // and is flagged `need` — see _step() and provideInput().
+  async _record() {
     try {
       const pyodide = await BefungeLogicInterpreter._loadPyodide(msg => this._report(msg));
       this._report('Running…');
 
       pyodide.runPython(PY_TRACE_RUNNER);
       const runner = pyodide.globals.get('_logifunge_trace');
-      const stdinLines = pyodide.toPy((this.stdin || '').split('\n'));
-      const proxy = runner(this.sourceCode, stdinLines, this.maxSteps);
+      const stdinLines = pyodide.toPy(this._lines());
+      const proxy = runner(this.sourceCode, stdinLines, this.maxSteps, this._eof, this._seed);
       this._trace = proxy.toJs({ dict_converter: Object.fromEntries });
       proxy.destroy();
       stdinLines.destroy();
@@ -390,6 +446,24 @@ class BefungeLogicInterpreter {
       this.error = `Pyodide error: ${err && err.message ? err.message : String(err)}`;
       this.running = false;
     }
+  }
+
+  // ── TERMINAL INPUT ──────────────────────────────────────────────
+  // The IDE calls these when the user presses Enter / Ctrl+D in the
+  // terminal. Stepping engines can't be paused mid-line (see the header
+  // comment), so once a recording exists we re-record with the extra line;
+  // the new recording starts with the same events, so replay just carries
+  // on from where it stopped. Async — callers must await.
+  async provideInput(text) {
+    this._lines().push(String(text));
+    this.awaitingInput = null;
+    if (this._trace) await this._record();
+  }
+
+  async provideEOF() {
+    this._eof = true;
+    this.awaitingInput = null;
+    if (this._trace) await this._record();
   }
 
   // Instant mode: run the program once at full speed, no tracing and no
@@ -401,6 +475,7 @@ class BefungeLogicInterpreter {
     this.error = null;
     this.output = '';
     this.stack = [];
+    this.awaitingInput = null;
 
     try {
       const pyodide = await BefungeLogicInterpreter._loadPyodide(msg => this._report(msg));
@@ -410,11 +485,11 @@ class BefungeLogicInterpreter {
       const begin = pyodide.globals.get('_logifunge_instant_begin');
       const runProgram = pyodide.globals.get('_logifunge_instant_run');
       const end = pyodide.globals.get('_logifunge_instant_end');
-      const stdinLines = pyodide.toPy((this.stdin || '').split('\n'));
+      const stdinLines = pyodide.toPy(this._lines());
       const ns = pyodide.globals.get('dict')();
       ns.set('__name__', '__main__');
 
-      begin(this.sourceCode, stdinLines);
+      begin(this.sourceCode, stdinLines, this._eof, this._seed);
       // Resolves to an error description if the program raised, else undefined.
       const pyError = await runProgram(this.sourceCode, ns);
       const proxy = end(ns);
@@ -422,6 +497,7 @@ class BefungeLogicInterpreter {
 
       this.output = result.output;
       this.stack = result.final;
+      this.awaitingInput = result.need ? { kind: 'line' } : null;
       if (pyError) this.error = pyError;
       this.steps = 1;
 
@@ -445,6 +521,7 @@ class BefungeLogicInterpreter {
       stack: [...this.stack],
       memory: { ...this.memory },
       memoryPointer: this.memoryPointer,
+      awaitingInput: this.awaitingInput,
     };
   }
 
@@ -473,6 +550,12 @@ class BefungeLogicInterpreter {
 
     this.output = t.output;
     this.stack = t.final;
+    if (t.need) {
+      // The program reached an input() with no line typed yet: the prompt is
+      // already in the output, so hold here until provideInput() re-records.
+      this.awaitingInput = { kind: 'line' };
+      return true;
+    }
     if (t.error) this.error = t.error;
     this.running = false;
     return false;
@@ -480,10 +563,13 @@ class BefungeLogicInterpreter {
 
   run() {
     this.running = true;
-    this.steps = 0;
+    // run() can be resumed after pausing for terminal input, so only the
+    // first call resets the step counter.
+    if (!this._runStarted) { this._runStarted = true; this.steps = 0; }
     while (this.running && this.steps < this.maxSteps) {
       try {
         if (!this._step()) break;
+        if (this.awaitingInput) break; // paused for input — not a completed step
       } catch (err) {
         this.error = `Runtime error: ${err.message}`;
         this.running = false;
@@ -503,6 +589,7 @@ class BefungeLogicInterpreter {
       stack: [...this.stack],
       memory: { ...this.memory },
       memoryPointer: this.memoryPointer,
+      awaitingInput: this.awaitingInput,
     };
   }
 }

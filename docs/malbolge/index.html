@@ -42,7 +42,7 @@
 
   <section>
     <h2>Input</h2>
-    <p>The IDE's top bar shows an <b>Input</b> field for this engine, the same as for brainfrick. <span class="command">/</span> reads one character at a time from it: a newline is code 10, and once the field is exhausted every further <span class="command">/</span> yields 59048, the value the specification defines for end-of-file.</p>
+    <p>Input works like a terminal, the same as for brainfrick. When the program reaches <span class="command">/</span> with nothing left to read, it pauses and a blinking cursor appears at the end of the Output pane. Type a line and press <b>Enter</b>: the line (plus a newline, code 10) is echoed into the output and <span class="command">/</span> reads it one character at a time. Press <b>Ctrl+D</b> to end input &mdash; after that every further <span class="command">/</span> yields 59048, the value the specification defines for end-of-file.</p>
   </section>
 
   <section>

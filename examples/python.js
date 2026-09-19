@@ -23,9 +23,9 @@ const examples = [
   {
     name: 'Echo Input',
     mode: 'text',
-    desc: "Reads one line at a time with input(). Set the Input field (top bar) before running — each line becomes one input() call, in order",
+    desc: "Reads a line with input(). The run pauses at the prompt — type your answer in the terminal and press Enter",
     code: 'name = input("name: ")\nprint(f"hello, {name}!")',
-    expectedOutput: { text: '(depends on the Input field)' }
+    expectedOutput: { text: '(depends on what you type)' }
   },
   {
     name: 'Standard Library',
