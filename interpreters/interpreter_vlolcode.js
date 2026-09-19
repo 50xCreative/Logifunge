@@ -714,7 +714,7 @@ class BefungeLogicInterpreter {
       case 'O': yield* this._execIf(); return;
       case 'WTF': yield* this._execSwitch(); return;
       case 'IM': yield* this._execLoop(); return;
-      case 'HOW': yield* this._skipBlock(); return; // already registered by the prescan
+      case 'HOW': yield* this._skipFunctionDef(); return; // already registered by the prescan
 
       default: {
         // Recast ("x IS NOW A TYPE"), assignment ("x R expr"), or a bare expression statement (sets IT).
@@ -772,6 +772,26 @@ class BefungeLogicInterpreter {
       return;
     }
     while (this._cur() && this._cur().type !== 'sep') yield* this._advance();
+    yield* this._consumeSep();
+  }
+
+  // HOW IZ I ... IF U SAY SO is fully known from the prescan (blockEnd
+  // already maps the opener straight to its OIC), so there's no need to
+  // walk the header and body one token at a time like _skipBlock() does
+  // for O RLY / WTF / IM IN YR. Jump tp straight past the whole
+  // definition and surface it as a single step spanning the block, so
+  // the UI highlights "HOW IZ I ... IF U SAY SO" once instead of
+  // stepping through every token inside a function that isn't running.
+  *_skipFunctionDef() {
+    yield* this._skipTrivia();
+    const openTp = this.tp;
+    const openTok = this._cur();
+    const closeTp = this.blockEnd.get(openTp);
+    if (closeTp === undefined) { yield* this._skipBlock(); return; } // fallback, shouldn't happen
+    const closeTok = this.tokens[closeTp];
+    this.tp = closeTp + 1;
+    while (this._cur() && this._cur().type === 'word') this.tp++; // rest of closer's words, no extra step
+    yield { row: openTok.row, col: openTok.col, endCol: closeTok.endCol };
     yield* this._consumeSep();
   }
 
